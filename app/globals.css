@@ -57,6 +57,31 @@ button {
   overflow: hidden;
 }
 
+.map-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: rgba(244, 240, 232, 0.72);
+  background:
+    linear-gradient(rgba(244, 240, 232, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 240, 232, 0.03) 1px, transparent 1px),
+    #020202;
+  background-size: 72px 72px;
+}
+
+.map-fallback span {
+  max-width: 320px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(5, 5, 6, 0.72);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 .maplibregl-canvas {
   cursor: grab;
   filter: contrast(1.06) brightness(0.9) saturate(0.72);
@@ -83,6 +108,56 @@ button {
   z-index: 4;
   pointer-events: none;
   overflow: hidden;
+}
+
+.topography-grid {
+  position: absolute;
+  left: 8vw;
+  right: 8vw;
+  bottom: 10vh;
+  height: 42vh;
+  opacity: 0.5;
+  transform: perspective(760px) rotateX(64deg);
+  transform-origin: 50% 100%;
+}
+
+.contour-line {
+  position: absolute;
+  left: 50%;
+  width: min(88vw, 1120px);
+  height: 70px;
+  border-top: 1px solid rgba(244, 240, 232, 0.36);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.contour-line--a {
+  bottom: 0;
+  width: min(92vw, 1180px);
+  border-color: rgba(244, 240, 232, 0.52);
+}
+
+.contour-line--b {
+  bottom: 11%;
+  width: min(80vw, 980px);
+}
+
+.contour-line--c {
+  bottom: 25%;
+  width: min(68vw, 780px);
+  border-color: rgba(238, 143, 88, 0.42);
+}
+
+.contour-line--d {
+  bottom: 42%;
+  width: min(52vw, 600px);
+  border-color: rgba(240, 109, 50, 0.44);
+}
+
+.contour-line--e {
+  bottom: 62%;
+  width: min(34vw, 420px);
+  border-color: rgba(240, 109, 50, 0.32);
 }
 
 .depth-lines {

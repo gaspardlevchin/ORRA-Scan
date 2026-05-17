@@ -20,15 +20,15 @@ Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 - Repli automatique sur Paris si la géolocalisation est refusée, indisponible ou non supportée.
 - Carte mondiale vectorielle open source.
 - Style carte maison minimal, sans labels ni POI visibles par défaut.
-- Relief 3D DEM ouvert activable à la demande.
-- Bâtiments 3D extrudés activés par défaut et désactivables quand les données OSM/OpenFreeMap sont disponibles.
+- Relief 3D DEM ouvert activé par défaut pour rendre les formes du terrain lisibles.
+- Bâtiments 3D extrudés désactivés au démarrage, puis activables quand les données OSM/OpenFreeMap sont disponibles.
 - Marqueur de position utilisateur.
 - Suivi GPS live via l'API Geolocation du navigateur.
 - Altitude terrain via Open-Meteo/Copernicus DEM.
 - Panneau d'informations compact : centre de carte, position utilisateur, altitude, zoom/pitch et statut de géolocalisation, avec détails GPS au survol.
 - Contrôles : me localiser, activer/désactiver la topo, activer/désactiver les bâtiments, plein écran.
 - Interface responsive desktop et mobile.
-- Premier chargement allégé : la carte s'affiche avec un style vectoriel réduit et sans couche topo DEM active.
+- Premier chargement allégé : MapLibre est chargé dynamiquement, la carte utilise un style vectoriel réduit et les bâtiments 3D restent désactivés au démarrage.
 
 ## Stack
 

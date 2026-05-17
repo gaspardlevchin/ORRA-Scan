@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
 import { ControlPanel } from "@/components/ControlPanel";
 import { InfoPanel } from "@/components/InfoPanel";
 import { RadarOverlay } from "@/components/RadarOverlay";
@@ -22,12 +21,13 @@ import {
   setOpenBuildingsVisibility,
 } from "@/lib/open-maps";
 import type { GeoPoint, MapTelemetry } from "@/types/map";
+import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 
-const DEFAULT_ZOOM = 15.25;
-const DEFAULT_PITCH = 62;
+const USER_ZOOM = 16.35;
+const USER_PITCH = 64;
 const DEFAULT_BEARING = -24;
-const INITIAL_ZOOM = 13.8;
-const INITIAL_PITCH = 46;
+const INITIAL_ZOOM = 12.65;
+const INITIAL_PITCH = 48;
 
 const initialTelemetry: MapTelemetry = {
   center: {
@@ -39,8 +39,8 @@ const initialTelemetry: MapTelemetry = {
   userElevation: null,
   zoom: INITIAL_ZOOM,
   pitch: INITIAL_PITCH,
-  terrainEnabled: false,
-  buildingsEnabled: true,
+  terrainEnabled: true,
+  buildingsEnabled: false,
   geolocationStatus: "idle",
   geolocationError: null,
 };
@@ -48,8 +48,9 @@ const initialTelemetry: MapTelemetry = {
 export function MapView() {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerRef = useRef<maplibregl.Marker | null>(null);
+  const maplibreRef = useRef<typeof import("maplibre-gl").default | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<MapLibreMarker | null>(null);
   const watchPositionRef = useRef<number | null>(null);
   const centerElevationAbortRef = useRef<AbortController | null>(null);
   const userElevationAbortRef = useRef<AbortController | null>(null);
@@ -60,9 +61,10 @@ export function MapView() {
   const userLocationRef = useRef<GeoPoint | null>(null);
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
   const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const updateTelemetryFromMap = useCallback((map: maplibregl.Map) => {
+  const updateTelemetryFromMap = useCallback((map: MapLibreMap) => {
     const center = map.getCenter();
 
     setTelemetry((current) => ({
@@ -78,8 +80,9 @@ export function MapView() {
 
   const setUserMarker = useCallback((location: GeoPoint) => {
     const map = mapRef.current;
+    const maplibre = maplibreRef.current;
 
-    if (!map) {
+    if (!map || !maplibre) {
       return;
     }
 
@@ -91,7 +94,7 @@ export function MapView() {
       pulseElement.className = "user-marker__pulse";
       markerElement.appendChild(pulseElement);
 
-      markerRef.current = new maplibregl.Marker({
+      markerRef.current = new maplibre.Marker({
         anchor: "center",
         element: markerElement,
       }).addTo(map);
@@ -109,11 +112,30 @@ export function MapView() {
 
     map.flyTo({
       center: [location.longitude, location.latitude],
-      zoom: Math.max(map.getZoom(), DEFAULT_ZOOM),
-      pitch: DEFAULT_PITCH,
+      zoom: Math.max(map.getZoom(), USER_ZOOM),
+      pitch: USER_PITCH,
       bearing:
         typeof location.heading === "number" ? location.heading : DEFAULT_BEARING,
       duration: 1400,
+      essential: true,
+    });
+
+    return true;
+  }, []);
+
+  const centerFallbackMapOn = useCallback((location: GeoPoint): boolean => {
+    const map = mapRef.current;
+
+    if (!map) {
+      return false;
+    }
+
+    map.easeTo({
+      center: [location.longitude, location.latitude],
+      zoom: INITIAL_ZOOM,
+      pitch: INITIAL_PITCH,
+      bearing: DEFAULT_BEARING,
+      duration: 900,
       essential: true,
     });
 
@@ -241,11 +263,11 @@ export function MapView() {
         }));
 
         if (centerAfterResolve && !hasCachedLocation) {
-          centerMapOn(PARIS_CENTER);
+          centerFallbackMapOn(PARIS_CENTER);
         }
       }
     },
-    [applyUserLocation, centerMapOn, startLivePositionWatch],
+    [applyUserLocation, centerFallbackMapOn, startLivePositionWatch],
   );
 
   useEffect(() => {
@@ -262,61 +284,108 @@ export function MapView() {
       return;
     }
 
-    const map = new maplibregl.Map({
-      attributionControl: false,
-      bearing: DEFAULT_BEARING,
-      center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
-      container: mapContainerRef.current,
-      maxPitch: 72,
-      maxZoom: 18.5,
-      minZoom: 2,
-      pitch: INITIAL_PITCH,
-      style: OPENFREE_MAP_STYLE,
-      zoom: INITIAL_ZOOM,
-    });
+    let cancelled = false;
+    let activeMap: MapLibreMap | null = null;
 
-    mapRef.current = map;
-    map.dragRotate.enable();
-    map.touchZoomRotate.enableRotation();
-    map.keyboard.enable();
+    const loadMap = async () => {
+      setMapError(null);
 
-    map.addControl(
-      new maplibregl.AttributionControl({
-        compact: true,
-      }),
-      "bottom-right",
-    );
+      try {
+        const maplibre = (await import("maplibre-gl")).default;
 
-    const handleMapUpdate = () => updateTelemetryFromMap(map);
+        if (cancelled || !mapContainerRef.current) {
+          return;
+        }
 
-    map.on("load", () => {
-      setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
-      mapReadyRef.current = true;
-      setMapReady(true);
-      updateTelemetryFromMap(map);
-      void refreshElevation(PARIS_CENTER, "center");
-    });
+        maplibreRef.current = maplibre;
 
-    map.on("move", handleMapUpdate);
-    map.on("moveend", () => {
-      if (centerElevationTimerRef.current !== null) {
-        window.clearTimeout(centerElevationTimerRef.current);
-      }
+        if (!maplibre.supported()) {
+          setMapError("WebGL indisponible sur ce navigateur.");
+          return;
+        }
 
-      const center = map.getCenter();
+        const map = new maplibre.Map({
+          attributionControl: false,
+          bearing: DEFAULT_BEARING,
+          center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
+          container: mapContainerRef.current,
+          fadeDuration: 0,
+          maxPitch: 72,
+          maxZoom: 18.5,
+          minZoom: 2,
+          pitch: INITIAL_PITCH,
+          style: OPENFREE_MAP_STYLE,
+          zoom: INITIAL_ZOOM,
+        });
 
-      centerElevationTimerRef.current = window.setTimeout(() => {
-        void refreshElevation(
-          {
-            latitude: center.lat,
-            longitude: center.lng,
-          },
-          "center",
+        activeMap = map;
+        mapRef.current = map;
+        map.dragRotate.enable();
+        map.touchZoomRotate.enableRotation();
+        map.keyboard.enable();
+
+        map.addControl(
+          new maplibre.AttributionControl({
+            compact: true,
+          }),
+          "bottom-right",
         );
-      }, 700);
-    });
+
+        const handleMapUpdate = () => updateTelemetryFromMap(map);
+
+        map.on("load", () => {
+          if (initialTelemetry.terrainEnabled) {
+            addOpenTopographyOverlay(map);
+          }
+
+          setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
+          mapReadyRef.current = true;
+          setMapReady(true);
+          updateTelemetryFromMap(map);
+          void refreshElevation(PARIS_CENTER, "center");
+        });
+
+        map.on("error", (event) => {
+          const mapErrorEvent = event as { error?: { message?: string } };
+          const message = mapErrorEvent.error?.message ?? "";
+
+          if (
+            !mapReadyRef.current &&
+            (message.includes("Failed to fetch") ||
+              message.includes("NetworkError"))
+          ) {
+            setMapError("Source cartographique temporairement indisponible.");
+          }
+        });
+
+        map.on("move", handleMapUpdate);
+        map.on("moveend", () => {
+          if (centerElevationTimerRef.current !== null) {
+            window.clearTimeout(centerElevationTimerRef.current);
+          }
+
+          const center = map.getCenter();
+
+          centerElevationTimerRef.current = window.setTimeout(() => {
+            void refreshElevation(
+              {
+                latitude: center.lat,
+                longitude: center.lng,
+              },
+              "center",
+            );
+          }, 700);
+        });
+      } catch {
+        setMapError("Impossible de charger la carte.");
+        setMapReady(false);
+      }
+    };
+
+    void loadMap();
 
     return () => {
+      cancelled = true;
       if (centerElevationTimerRef.current !== null) {
         window.clearTimeout(centerElevationTimerRef.current);
       }
@@ -324,8 +393,9 @@ export function MapView() {
       userElevationAbortRef.current?.abort();
       markerRef.current?.remove();
       markerRef.current = null;
-      map.remove();
+      activeMap?.remove();
       mapRef.current = null;
+      maplibreRef.current = null;
       mapReadyRef.current = false;
       setMapReady(false);
     };
@@ -430,6 +500,11 @@ export function MapView() {
     <main className="scan-app" ref={shellRef}>
       <section className="map-stage" aria-label="Carte topographique 3D">
         <div className="map-container" ref={mapContainerRef} />
+        {mapError ? (
+          <div className="map-fallback" role="status">
+            <span>{mapError}</span>
+          </div>
+        ) : null}
         <div className="scan-vignette" />
         <RadarOverlay />
         <div className="scanner-frame" aria-hidden="true">
