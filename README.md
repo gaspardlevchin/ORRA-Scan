@@ -2,13 +2,13 @@
 
 Application web professionnelle en Next.js + TypeScript pour lire une carte topographique mondiale comme un scanner GPS.
 
-L'interface reprend un langage d'instrument terrain : carte sombre, grille verte, ligne de visée, cibles radar, position appareil, altitude ouverte et lecture GPS live.
+L'interface reprend un langage d'instrument terrain : carte noire minimale, lignes de profondeur, bâtiments 3D graphite, position appareil, altitude ouverte et lecture GPS live.
 
 ## Sources ouvertes
 
 - MapLibre GL JS pour le rendu WebGL.
 - OpenFreeMap / OpenStreetMap pour la carte vectorielle mondiale.
-- OpenTopoMap pour l'overlay topographique.
+- Mapzen Terrain Tiles pour le relief DEM activable.
 - Open-Meteo Elevation API, basée sur Copernicus DEM GLO-90, pour l'altitude terrain.
 
 Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
@@ -19,15 +19,16 @@ Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 - Centrage automatique sur la position utilisateur si l'autorisation est accordée.
 - Repli automatique sur Paris si la géolocalisation est refusée, indisponible ou non supportée.
 - Carte mondiale vectorielle open source.
-- Overlay topographique ouvert avec relief visuel, activable à la demande.
-- Bâtiments 3D extrudés activables quand les données OSM/OpenFreeMap sont disponibles.
+- Style carte maison minimal, sans labels ni POI visibles par défaut.
+- Relief 3D DEM ouvert activable à la demande.
+- Bâtiments 3D extrudés activés par défaut et désactivables quand les données OSM/OpenFreeMap sont disponibles.
 - Marqueur de position utilisateur.
 - Suivi GPS live via l'API Geolocation du navigateur.
 - Altitude terrain via Open-Meteo/Copernicus DEM.
-- Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, cap, vitesse, précision, altitude appareil, altitude terrain et statut de géolocalisation.
+- Panneau d'informations compact : centre de carte, position utilisateur, altitude, zoom/pitch et statut de géolocalisation, avec détails GPS au survol.
 - Contrôles : me localiser, activer/désactiver la topo, activer/désactiver les bâtiments, plein écran.
 - Interface responsive desktop et mobile.
-- Premier chargement allégé : la carte s'affiche d'abord sans overlay topo raster ni bâtiments 3D, puis ces couches peuvent être activées depuis les contrôles.
+- Premier chargement allégé : la carte s'affiche avec un style vectoriel réduit et sans couche topo DEM active.
 
 ## Stack
 
@@ -36,7 +37,7 @@ Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 - React
 - MapLibre GL JS
 - OpenFreeMap
-- OpenTopoMap
+- Mapzen Terrain Tiles
 - Open-Meteo Elevation API
 - CSS global sans bibliothèque UI lourde
 
@@ -131,11 +132,11 @@ types/
 ## Notes de maintenance
 
 - `components/MapView.tsx` contient l'orchestration MapLibre, la géolocalisation et les interactions de carte.
-- `lib/open-maps.ts` regroupe les styles et couches open source.
+- `lib/open-maps.ts` regroupe le style vectoriel minimal, le relief DEM et les bâtiments 3D.
 - `lib/elevation.ts` isole les appels Open-Meteo/Copernicus DEM.
 - `lib/geolocation.ts` isole l'accès au navigateur et les messages d'erreur.
 - `types/map.ts` centralise les types partagés par l'interface.
 
 ## Attributions
 
-Les données et tuiles utilisées imposent une attribution visible. MapLibre affiche l'attribution fournie par les styles et les sources, notamment OpenStreetMap, OpenFreeMap, OpenMapTiles, OpenTopoMap et Open-Meteo/Copernicus lorsque l'altitude est utilisée.
+Les données et tuiles utilisées imposent une attribution visible. MapLibre affiche l'attribution fournie par les styles et les sources, notamment OpenStreetMap, OpenFreeMap, OpenMapTiles, Mapzen Terrain Tiles et Open-Meteo/Copernicus lorsque l'altitude est utilisée.

@@ -32,8 +32,10 @@ export function ControlPanel({
         type="button"
         onClick={onLocate}
         disabled={isLocating}
+        aria-label="Me localiser"
+        title="Me localiser"
       >
-        {isLocating ? "Localisation..." : "Me localiser"}
+        {isLocating ? "..." : "GPS"}
       </button>
       <button
         className="control-button"
@@ -41,8 +43,10 @@ export function ControlPanel({
         data-active={terrainEnabled}
         onClick={onToggleTerrain}
         disabled={!mapReady}
+        aria-label="Activer ou désactiver le relief"
+        title="Relief"
       >
-        {terrainEnabled ? "Topo active" : "Topo inactive"}
+        TOPO
       </button>
       <button
         className="control-button"
@@ -50,16 +54,20 @@ export function ControlPanel({
         data-active={buildingsEnabled}
         onClick={onToggleBuildings}
         disabled={!mapReady}
+        aria-label="Activer ou désactiver les bâtiments 3D"
+        title="Bâtiments 3D"
       >
-        {buildingsEnabled ? "Bâtiments 3D" : "Sans bâtiments"}
+        3D
       </button>
       <button
         className="control-button"
         type="button"
         data-active={isFullscreen}
         onClick={onToggleFullscreen}
+        aria-label="Plein écran"
+        title="Plein écran"
       >
-        {isFullscreen ? "Quitter plein écran" : "Plein écran"}
+        FULL
       </button>
     </div>
   );

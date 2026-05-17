@@ -16,7 +16,6 @@ import {
   watchUserPosition,
 } from "@/lib/geolocation";
 import {
-  addOpenBuildings,
   addOpenTopographyOverlay,
   OPENFREE_MAP_STYLE,
   removeOpenTopographyOverlay,
@@ -41,7 +40,7 @@ const initialTelemetry: MapTelemetry = {
   zoom: INITIAL_ZOOM,
   pitch: INITIAL_PITCH,
   terrainEnabled: false,
-  buildingsEnabled: false,
+  buildingsEnabled: true,
   geolocationStatus: "idle",
   geolocationError: null,
 };
@@ -268,12 +267,19 @@ export function MapView() {
       bearing: DEFAULT_BEARING,
       center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
       container: mapContainerRef.current,
+      maxPitch: 72,
+      maxZoom: 18.5,
+      minZoom: 2,
       pitch: INITIAL_PITCH,
       style: OPENFREE_MAP_STYLE,
       zoom: INITIAL_ZOOM,
     });
 
     mapRef.current = map;
+    map.dragRotate.enable();
+    map.touchZoomRotate.enableRotation();
+    map.keyboard.enable();
+
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true,
@@ -284,7 +290,7 @@ export function MapView() {
     const handleMapUpdate = () => updateTelemetryFromMap(map);
 
     map.on("load", () => {
-      setOpenBuildingsVisibility(map, false);
+      setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
       mapReadyRef.current = true;
       setMapReady(true);
       updateTelemetryFromMap(map);
@@ -437,11 +443,13 @@ export function MapView() {
       </section>
 
       <header className="scan-topbar">
-        <div className="scan-topbar__mark">OR</div>
-        <div className="scan-topbar__title">
-          <h1>ORRA Scan</h1>
-          <p>GPS topographique mondial • relief 3D live</p>
-        </div>
+        <div className="scan-topbar__mark">ORRA</div>
+        <span
+          className="scan-topbar__status"
+          data-status={telemetry.geolocationStatus}
+        >
+          {telemetry.geolocationStatus === "granted" ? "GPS" : "IDLE"}
+        </span>
       </header>
 
       <div className="panel-stack">
