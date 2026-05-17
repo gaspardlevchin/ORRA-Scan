@@ -23,6 +23,11 @@ import {
 import type { GeoPoint, MapTelemetry } from "@/types/map";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 
+type MapLibreRuntime = Pick<
+  typeof import("maplibre-gl"),
+  "AttributionControl" | "Map" | "Marker"
+>;
+
 const USER_ZOOM = 16.35;
 const USER_PITCH = 64;
 const DEFAULT_BEARING = -24;
@@ -48,7 +53,7 @@ const initialTelemetry: MapTelemetry = {
 export function MapView() {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const maplibreRef = useRef<typeof import("maplibre-gl") | null>(null);
+  const maplibreRef = useRef<MapLibreRuntime | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<MapLibreMarker | null>(null);
   const watchPositionRef = useRef<number | null>(null);
@@ -291,18 +296,18 @@ export function MapView() {
       setMapError(null);
 
       try {
-        const maplibre = await import("maplibre-gl");
+        if (!browserSupportsWebGL()) {
+          setMapError("WebGL indisponible sur ce navigateur.");
+          return;
+        }
+
+        const maplibre: MapLibreRuntime = await import("maplibre-gl");
 
         if (cancelled || !mapContainerRef.current) {
           return;
         }
 
         maplibreRef.current = maplibre;
-
-        if (!maplibre.supported()) {
-          setMapError("WebGL indisponible sur ce navigateur.");
-          return;
-        }
 
         const map = new maplibre.Map({
           attributionControl: false,
@@ -543,4 +548,22 @@ export function MapView() {
       </div>
     </main>
   );
+}
+
+function browserSupportsWebGL(): boolean {
+  if (typeof document === "undefined") {
+    return false;
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+
+    return Boolean(
+      canvas.getContext("webgl2") ||
+        canvas.getContext("webgl") ||
+        canvas.getContext("experimental-webgl"),
+    );
+  } catch {
+    return false;
+  }
 }
