@@ -11,9 +11,15 @@ export const PARIS_CENTER: GeoPoint = {
 };
 
 export const GEOLOCATION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: true,
-  timeout: 10000,
-  maximumAge: 30000,
+  enableHighAccuracy: false,
+  timeout: 8000,
+  maximumAge: 120000,
+};
+
+export const WATCH_GEOLOCATION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 30000,
+  maximumAge: 60000,
 };
 
 export function getCurrentUserPosition(
@@ -31,7 +37,7 @@ export function getCurrentUserPosition(
 export function watchUserPosition(
   onPosition: (position: GeolocationPosition) => void,
   onError: (error: GeolocationPositionError) => void,
-  options: PositionOptions = GEOLOCATION_OPTIONS,
+  options: PositionOptions = WATCH_GEOLOCATION_OPTIONS,
 ): number | null {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     return null;
@@ -73,6 +79,10 @@ export function geolocationStatusFromError(
     }
 
     if (geolocationError.code === geolocationError.positionUnavailable) {
+      return "unavailable";
+    }
+
+    if (geolocationError.code === geolocationError.timeout) {
       return "unavailable";
     }
 

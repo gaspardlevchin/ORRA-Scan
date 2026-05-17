@@ -19,14 +19,15 @@ Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 - Centrage automatique sur la position utilisateur si l'autorisation est accordée.
 - Repli automatique sur Paris si la géolocalisation est refusée, indisponible ou non supportée.
 - Carte mondiale vectorielle open source.
-- Overlay topographique ouvert avec relief visuel.
-- Bâtiments 3D extrudés quand les données OSM/OpenFreeMap sont disponibles.
+- Overlay topographique ouvert avec relief visuel, activable à la demande.
+- Bâtiments 3D extrudés activables quand les données OSM/OpenFreeMap sont disponibles.
 - Marqueur de position utilisateur.
 - Suivi GPS live via l'API Geolocation du navigateur.
 - Altitude terrain via Open-Meteo/Copernicus DEM.
 - Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, cap, vitesse, précision, altitude appareil, altitude terrain et statut de géolocalisation.
 - Contrôles : me localiser, activer/désactiver la topo, activer/désactiver les bâtiments, plein écran.
 - Interface responsive desktop et mobile.
+- Premier chargement allégé : la carte s'affiche d'abord sans overlay topo raster ni bâtiments 3D, puis ces couches peuvent être activées depuis les contrôles.
 
 ## Stack
 

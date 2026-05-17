@@ -27,6 +27,8 @@ import type { GeoPoint, MapTelemetry } from "@/types/map";
 const DEFAULT_ZOOM = 15.25;
 const DEFAULT_PITCH = 62;
 const DEFAULT_BEARING = -24;
+const INITIAL_ZOOM = 13.8;
+const INITIAL_PITCH = 46;
 
 const initialTelemetry: MapTelemetry = {
   center: {
@@ -36,10 +38,10 @@ const initialTelemetry: MapTelemetry = {
   userLocation: null,
   centerElevation: null,
   userElevation: null,
-  zoom: DEFAULT_ZOOM,
-  pitch: DEFAULT_PITCH,
-  terrainEnabled: true,
-  buildingsEnabled: true,
+  zoom: INITIAL_ZOOM,
+  pitch: INITIAL_PITCH,
+  terrainEnabled: false,
+  buildingsEnabled: false,
   geolocationStatus: "idle",
   geolocationError: null,
 };
@@ -52,8 +54,11 @@ export function MapView() {
   const watchPositionRef = useRef<number | null>(null);
   const centerElevationAbortRef = useRef<AbortController | null>(null);
   const userElevationAbortRef = useRef<AbortController | null>(null);
+  const centerElevationTimerRef = useRef<number | null>(null);
   const centeredOnUserRef = useRef(false);
   const initialLocationRequestRef = useRef(false);
+  const mapReadyRef = useRef(false);
+  const userLocationRef = useRef<GeoPoint | null>(null);
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
   const [mapReady, setMapReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -144,6 +149,7 @@ export function MapView() {
 
   const applyUserLocation = useCallback(
     (location: GeoPoint, centerAfterResolve: boolean) => {
+      userLocationRef.current = location;
       setTelemetry((current) => ({
         ...current,
         userLocation: location,
@@ -154,7 +160,9 @@ export function MapView() {
       void refreshElevation(location, "user");
 
       if (centerAfterResolve) {
-        centeredOnUserRef.current = centerMapOn(location);
+        centeredOnUserRef.current = mapReadyRef.current
+          ? centerMapOn(location)
+          : false;
       }
     },
     [centerMapOn, refreshElevation, setUserMarker],
@@ -172,10 +180,19 @@ export function MapView() {
         applyUserLocation(location, !centeredOnUserRef.current);
       },
       (error) => {
+        const nextStatus = geolocationStatusFromError(error);
+        const nextMessage = geolocationMessageFromError(error);
+
         setTelemetry((current) => ({
           ...current,
-          geolocationStatus: geolocationStatusFromError(error),
-          geolocationError: geolocationMessageFromError(error),
+          geolocationStatus:
+            current.userLocation && nextStatus !== "denied"
+              ? "granted"
+              : nextStatus,
+          geolocationError:
+            current.userLocation && nextStatus !== "denied"
+              ? `Dernière position conservée. ${nextMessage}`
+              : nextMessage,
         }));
       },
     );
@@ -208,13 +225,23 @@ export function MapView() {
         applyUserLocation(location, centerAfterResolve);
         startLivePositionWatch();
       } catch (error) {
+        const nextStatus = geolocationStatusFromError(error);
+        const nextMessage = geolocationMessageFromError(error);
+        const hasCachedLocation = userLocationRef.current !== null;
+
         setTelemetry((current) => ({
           ...current,
-          geolocationStatus: geolocationStatusFromError(error),
-          geolocationError: geolocationMessageFromError(error),
+          geolocationStatus:
+            current.userLocation && nextStatus !== "denied"
+              ? "granted"
+              : nextStatus,
+          geolocationError:
+            current.userLocation && nextStatus !== "denied"
+              ? `Dernière position conservée. ${nextMessage}`
+              : nextMessage,
         }));
 
-        if (centerAfterResolve) {
+        if (centerAfterResolve && !hasCachedLocation) {
           centerMapOn(PARIS_CENTER);
         }
       }
@@ -241,9 +268,9 @@ export function MapView() {
       bearing: DEFAULT_BEARING,
       center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
       container: mapContainerRef.current,
-      pitch: DEFAULT_PITCH,
+      pitch: INITIAL_PITCH,
       style: OPENFREE_MAP_STYLE,
-      zoom: DEFAULT_ZOOM,
+      zoom: INITIAL_ZOOM,
     });
 
     mapRef.current = map;
@@ -257,8 +284,8 @@ export function MapView() {
     const handleMapUpdate = () => updateTelemetryFromMap(map);
 
     map.on("load", () => {
-      addOpenTopographyOverlay(map);
-      addOpenBuildings(map);
+      setOpenBuildingsVisibility(map, false);
+      mapReadyRef.current = true;
       setMapReady(true);
       updateTelemetryFromMap(map);
       void refreshElevation(PARIS_CENTER, "center");
@@ -266,23 +293,34 @@ export function MapView() {
 
     map.on("move", handleMapUpdate);
     map.on("moveend", () => {
+      if (centerElevationTimerRef.current !== null) {
+        window.clearTimeout(centerElevationTimerRef.current);
+      }
+
       const center = map.getCenter();
-      void refreshElevation(
-        {
-          latitude: center.lat,
-          longitude: center.lng,
-        },
-        "center",
-      );
+
+      centerElevationTimerRef.current = window.setTimeout(() => {
+        void refreshElevation(
+          {
+            latitude: center.lat,
+            longitude: center.lng,
+          },
+          "center",
+        );
+      }, 700);
     });
 
     return () => {
+      if (centerElevationTimerRef.current !== null) {
+        window.clearTimeout(centerElevationTimerRef.current);
+      }
       centerElevationAbortRef.current?.abort();
       userElevationAbortRef.current?.abort();
       markerRef.current?.remove();
       markerRef.current = null;
       map.remove();
       mapRef.current = null;
+      mapReadyRef.current = false;
       setMapReady(false);
     };
   }, [refreshElevation, updateTelemetryFromMap]);
@@ -293,9 +331,8 @@ export function MapView() {
       telemetry.userLocation &&
       !centeredOnUserRef.current
     ) {
-      centeredOnUserRef.current = true;
       setUserMarker(telemetry.userLocation);
-      centerMapOn(telemetry.userLocation);
+      centeredOnUserRef.current = centerMapOn(telemetry.userLocation);
     }
   }, [centerMapOn, mapReady, setUserMarker, telemetry.userLocation]);
 
