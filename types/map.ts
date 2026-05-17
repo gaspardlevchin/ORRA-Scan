@@ -25,6 +25,8 @@ export type MapCenter = {
 export type MapTelemetry = {
   center: MapCenter;
   userLocation: GeoPoint | null;
+  centerElevation: number | null;
+  userElevation: number | null;
   zoom: number;
   pitch: number;
   terrainEnabled: boolean;

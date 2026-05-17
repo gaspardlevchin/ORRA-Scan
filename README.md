@@ -1,22 +1,31 @@
-# Terrain Scan App
+# ORRA Scan
 
-Application web professionnelle en Next.js + TypeScript pour visualiser une carte topographique 3D mondiale centrée automatiquement sur la position de l'utilisateur.
+Application web professionnelle en Next.js + TypeScript pour lire une carte topographique mondiale comme un scanner GPS.
 
-L'interface reprend un langage de scanner GPS : carte Mapbox GL JS, relief 3D, contours topographiques, grille verte, ligne de visée, cibles radar, coordonnées GPS live et contrôles essentiels.
+L'interface reprend un langage d'instrument terrain : carte sombre, grille verte, ligne de visée, cibles radar, position appareil, altitude ouverte et lecture GPS live.
+
+## Sources ouvertes
+
+- MapLibre GL JS pour le rendu WebGL.
+- OpenFreeMap / OpenStreetMap pour la carte vectorielle mondiale.
+- OpenTopoMap pour l'overlay topographique.
+- Open-Meteo Elevation API, basée sur Copernicus DEM GLO-90, pour l'altitude terrain.
+
+Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 
 ## Fonctionnalités
 
 - Demande de géolocalisation au chargement.
 - Centrage automatique sur la position utilisateur si l'autorisation est accordée.
 - Repli automatique sur Paris si la géolocalisation est refusée, indisponible ou non supportée.
-- Carte Mapbox sombre avec terrain 3D et ombrage topographique.
-- Contours topographiques globaux issus des données terrain Mapbox.
-- Bâtiments 3D extrudés à partir des données Mapbox.
+- Carte mondiale vectorielle open source.
+- Overlay topographique ouvert avec relief visuel.
+- Bâtiments 3D extrudés quand les données OSM/OpenFreeMap sont disponibles.
 - Marqueur de position utilisateur.
-- Viseur central type scanner/radar avec grille et ligne de visée.
 - Suivi GPS live via l'API Geolocation du navigateur.
-- Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, cap, vitesse, précision, altitude disponible et statut de géolocalisation.
-- Contrôles : me localiser, activer/désactiver le terrain, activer/désactiver les bâtiments, plein écran.
+- Altitude terrain via Open-Meteo/Copernicus DEM.
+- Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, cap, vitesse, précision, altitude appareil, altitude terrain et statut de géolocalisation.
+- Contrôles : me localiser, activer/désactiver la topo, activer/désactiver les bâtiments, plein écran.
 - Interface responsive desktop et mobile.
 
 ## Stack
@@ -24,7 +33,10 @@ L'interface reprend un langage de scanner GPS : carte Mapbox GL JS, relief 3D, c
 - Next.js App Router
 - TypeScript
 - React
-- Mapbox GL JS
+- MapLibre GL JS
+- OpenFreeMap
+- OpenTopoMap
+- Open-Meteo Elevation API
 - CSS global sans bibliothèque UI lourde
 
 ## Installation
@@ -35,21 +47,15 @@ Prérequis recommandé : Node.js 22. Next.js reste compatible avec Node.js 20.9 
 npm install
 ```
 
-## Configuration Mapbox
+## Configuration
 
-Créez un fichier `.env.local` à la racine du projet :
+Le projet ne nécessite pas de clé API pour afficher la carte par défaut.
+
+Vous pouvez créer un fichier `.env.local` si vous ajoutez plus tard des services privés, mais la version open-source actuelle fonctionne sans variable d'environnement.
 
 ```bash
 cp .env.local.example .env.local
 ```
-
-Ajoutez votre token Mapbox public :
-
-```bash
-NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
-```
-
-Remplacez `your_mapbox_token_here` par votre clé Mapbox. Le token n'est jamais écrit directement dans le code source.
 
 ## Lancement local
 
@@ -66,13 +72,7 @@ Si le port `3000` est déjà utilisé, Next.js proposera automatiquement un autr
 1. Poussez ce repository sur GitHub.
 2. Créez un nouveau projet sur [Vercel](https://vercel.com).
 3. Importez le repository GitHub.
-4. Dans les variables d'environnement du projet Vercel, ajoutez :
-
-```bash
-NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
-```
-
-5. Lancez le déploiement.
+4. Lancez le déploiement.
 
 Le fichier `vercel.json` indique explicitement que le framework est Next.js. Vercel détecte ensuite les commandes standard du projet.
 
@@ -84,13 +84,7 @@ Pour publier l'application sur `https://gaspardlevchin.github.io/ORRA-Scan/` :
 
 1. Dans GitHub, ouvrez `Settings` > `Pages`.
 2. Dans `Build and deployment`, sélectionnez `GitHub Actions`.
-3. Dans `Settings` > `Secrets and variables` > `Actions`, ajoutez un secret :
-
-```bash
-NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
-```
-
-4. Poussez la branche `main`, ou lancez manuellement le workflow `Deploy GitHub Pages`.
+3. Poussez la branche `main`, ou lancez manuellement le workflow `Deploy GitHub Pages`.
 
 GitHub Pages sert l'application depuis le sous-chemin `/ORRA-Scan`. La configuration Next.js applique donc `basePath` et `assetPrefix` uniquement quand le build est lancé avec `GITHUB_PAGES=true`.
 
@@ -101,7 +95,7 @@ Les navigateurs n'autorisent la géolocalisation que dans des contextes sécuris
 - en local via `localhost` ;
 - en production via HTTPS.
 
-Vercel fournit automatiquement HTTPS en production, ce qui permet à la géolocalisation de fonctionner après déploiement si l'utilisateur l'autorise.
+Vercel et GitHub Pages fournissent HTTPS en production, ce qui permet à la géolocalisation de fonctionner après déploiement si l'utilisateur l'autorise.
 
 ## Scripts npm
 
@@ -126,15 +120,21 @@ components/
   ControlPanel.tsx
   RadarOverlay.tsx
 lib/
+  elevation.ts
   geolocation.ts
-  mapbox.ts
+  open-maps.ts
 types/
   map.ts
 ```
 
 ## Notes de maintenance
 
-- `components/MapView.tsx` contient l'orchestration Mapbox, la géolocalisation et les interactions de carte.
+- `components/MapView.tsx` contient l'orchestration MapLibre, la géolocalisation et les interactions de carte.
+- `lib/open-maps.ts` regroupe les styles et couches open source.
+- `lib/elevation.ts` isole les appels Open-Meteo/Copernicus DEM.
 - `lib/geolocation.ts` isole l'accès au navigateur et les messages d'erreur.
-- `lib/mapbox.ts` regroupe les constantes et helpers liés aux couches terrain et bâtiments.
 - `types/map.ts` centralise les types partagés par l'interface.
+
+## Attributions
+
+Les données et tuiles utilisées imposent une attribution visible. MapLibre affiche l'attribution fournie par les styles et les sources, notamment OpenStreetMap, OpenFreeMap, OpenMapTiles, OpenTopoMap et Open-Meteo/Copernicus lorsque l'altitude est utilisée.

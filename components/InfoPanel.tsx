@@ -45,8 +45,16 @@ export function InfoPanel({ telemetry }: InfoPanelProps) {
           value={formatAccuracy(telemetry.userLocation?.accuracy)}
         />
         <DataRow
-          label="Altitude"
+          label="Alt. appareil"
           value={formatAltitude(telemetry.userLocation?.altitude)}
+        />
+        <DataRow
+          label="Alt. centre"
+          value={formatAltitude(telemetry.centerElevation)}
+        />
+        <DataRow
+          label="Alt. GPS"
+          value={formatAltitude(telemetry.userElevation)}
         />
         <DataRow
           label="Géoloc."

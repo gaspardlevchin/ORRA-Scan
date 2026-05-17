@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
+import { useCallback, useEffect, useRef, useState } from "react";
+import maplibregl from "maplibre-gl";
 import { ControlPanel } from "@/components/ControlPanel";
 import { InfoPanel } from "@/components/InfoPanel";
 import { RadarOverlay } from "@/components/RadarOverlay";
+import { getOpenElevation } from "@/lib/elevation";
 import {
   clearUserPositionWatch,
   geolocationMessageFromError,
@@ -15,14 +16,12 @@ import {
   watchUserPosition,
 } from "@/lib/geolocation";
 import {
-  addBuildings,
-  addTerrain,
-  hasMapboxToken,
-  MAPBOX_STYLE,
-  MAPBOX_TOKEN,
-  removeTerrain,
-  setBuildingsVisibility,
-} from "@/lib/mapbox";
+  addOpenBuildings,
+  addOpenTopographyOverlay,
+  OPENFREE_MAP_STYLE,
+  removeOpenTopographyOverlay,
+  setOpenBuildingsVisibility,
+} from "@/lib/open-maps";
 import type { GeoPoint, MapTelemetry } from "@/types/map";
 
 const DEFAULT_ZOOM = 15.25;
@@ -35,6 +34,8 @@ const initialTelemetry: MapTelemetry = {
     longitude: PARIS_CENTER.longitude,
   },
   userLocation: null,
+  centerElevation: null,
+  userElevation: null,
   zoom: DEFAULT_ZOOM,
   pitch: DEFAULT_PITCH,
   terrainEnabled: true,
@@ -46,18 +47,18 @@ const initialTelemetry: MapTelemetry = {
 export function MapView() {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
   const watchPositionRef = useRef<number | null>(null);
+  const centerElevationAbortRef = useRef<AbortController | null>(null);
+  const userElevationAbortRef = useRef<AbortController | null>(null);
   const centeredOnUserRef = useRef(false);
   const initialLocationRequestRef = useRef(false);
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
   const [mapReady, setMapReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const tokenReady = useMemo(() => hasMapboxToken(), []);
-
-  const updateTelemetryFromMap = useCallback((map: mapboxgl.Map) => {
+  const updateTelemetryFromMap = useCallback((map: maplibregl.Map) => {
     const center = map.getCenter();
 
     setTelemetry((current) => ({
@@ -86,7 +87,7 @@ export function MapView() {
       pulseElement.className = "user-marker__pulse";
       markerElement.appendChild(pulseElement);
 
-      markerRef.current = new mapboxgl.Marker({
+      markerRef.current = new maplibregl.Marker({
         anchor: "center",
         element: markerElement,
       }).addTo(map);
@@ -115,6 +116,32 @@ export function MapView() {
     return true;
   }, []);
 
+  const refreshElevation = useCallback(
+    async (point: GeoPoint | { latitude: number; longitude: number }, target: "center" | "user") => {
+      const abortRef =
+        target === "center" ? centerElevationAbortRef : userElevationAbortRef;
+
+      abortRef.current?.abort();
+      const abortController = new AbortController();
+      abortRef.current = abortController;
+
+      try {
+        const elevation = await getOpenElevation(point, abortController.signal);
+
+        setTelemetry((current) => ({
+          ...current,
+          [target === "center" ? "centerElevation" : "userElevation"]:
+            elevation,
+        }));
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+      }
+    },
+    [],
+  );
+
   const applyUserLocation = useCallback(
     (location: GeoPoint, centerAfterResolve: boolean) => {
       setTelemetry((current) => ({
@@ -124,12 +151,13 @@ export function MapView() {
         geolocationError: null,
       }));
       setUserMarker(location);
+      void refreshElevation(location, "user");
 
       if (centerAfterResolve) {
         centeredOnUserRef.current = centerMapOn(location);
       }
     },
-    [centerMapOn, setUserMarker],
+    [centerMapOn, refreshElevation, setUserMarker],
   );
 
   const startLivePositionWatch = useCallback(() => {
@@ -204,26 +232,24 @@ export function MapView() {
   }, [requestLocation]);
 
   useEffect(() => {
-    if (!tokenReady || !mapContainerRef.current || mapRef.current) {
+    if (!mapContainerRef.current || mapRef.current) {
       return;
     }
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-
-    const map = new mapboxgl.Map({
+    const map = new maplibregl.Map({
       antialias: true,
       attributionControl: false,
       bearing: DEFAULT_BEARING,
       center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
       container: mapContainerRef.current,
       pitch: DEFAULT_PITCH,
-      style: MAPBOX_STYLE,
+      style: OPENFREE_MAP_STYLE,
       zoom: DEFAULT_ZOOM,
     });
 
     mapRef.current = map;
     map.addControl(
-      new mapboxgl.AttributionControl({
+      new maplibregl.AttributionControl({
         compact: true,
       }),
       "bottom-right",
@@ -232,22 +258,35 @@ export function MapView() {
     const handleMapUpdate = () => updateTelemetryFromMap(map);
 
     map.on("load", () => {
-      addTerrain(map);
-      addBuildings(map);
+      addOpenTopographyOverlay(map);
+      addOpenBuildings(map);
       setMapReady(true);
       updateTelemetryFromMap(map);
+      void refreshElevation(PARIS_CENTER, "center");
     });
 
     map.on("move", handleMapUpdate);
+    map.on("moveend", () => {
+      const center = map.getCenter();
+      void refreshElevation(
+        {
+          latitude: center.lat,
+          longitude: center.lng,
+        },
+        "center",
+      );
+    });
 
     return () => {
+      centerElevationAbortRef.current?.abort();
+      userElevationAbortRef.current?.abort();
       markerRef.current?.remove();
       markerRef.current = null;
       map.remove();
       mapRef.current = null;
       setMapReady(false);
     };
-  }, [tokenReady, updateTelemetryFromMap]);
+  }, [refreshElevation, updateTelemetryFromMap]);
 
   useEffect(() => {
     if (
@@ -292,9 +331,9 @@ export function MapView() {
       const nextValue = !current.terrainEnabled;
 
       if (nextValue) {
-        addTerrain(map);
+        addOpenTopographyOverlay(map);
       } else {
-        removeTerrain(map);
+        removeOpenTopographyOverlay(map);
       }
 
       return {
@@ -313,7 +352,7 @@ export function MapView() {
 
     setTelemetry((current) => {
       const nextValue = !current.buildingsEnabled;
-      setBuildingsVisibility(map, nextValue);
+      setOpenBuildingsVisibility(map, nextValue);
 
       return {
         ...current,
@@ -348,20 +387,7 @@ export function MapView() {
   return (
     <main className="scan-app" ref={shellRef}>
       <section className="map-stage" aria-label="Carte topographique 3D">
-        {tokenReady ? (
-          <div className="map-container" ref={mapContainerRef} />
-        ) : (
-          <div className="token-fallback" role="alert">
-            <div className="token-fallback__panel">
-              <p className="token-fallback__label">Configuration requise</p>
-              <h1>Token Mapbox manquant</h1>
-              <p>
-                Ajoutez <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> dans un fichier{" "}
-                <code>.env.local</code>, puis relancez <code>npm run dev</code>.
-              </p>
-            </div>
-          </div>
-        )}
+        <div className="map-container" ref={mapContainerRef} />
         <div className="scan-vignette" />
         <RadarOverlay />
         <div className="scanner-frame" aria-hidden="true">

@@ -42,7 +42,7 @@ export function ControlPanel({
         onClick={onToggleTerrain}
         disabled={!mapReady}
       >
-        {terrainEnabled ? "Terrain actif" : "Terrain inactif"}
+        {terrainEnabled ? "Topo active" : "Topo inactive"}
       </button>
       <button
         className="control-button"

@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Terrain Scan",
+  title: "ORRA Scan",
   description:
-    "Lecture topographique 3D avec géolocalisation, terrain Mapbox et bâtiments extrudés.",
+    "Scanner GPS topographique open source avec carte mondiale, géolocalisation et relief visuel.",
 };
 
 export const viewport: Viewport = {

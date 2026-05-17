@@ -2,7 +2,7 @@
   "name": "terrain-scan-app",
   "version": "0.1.0",
   "private": true,
-  "description": "Application Next.js de lecture topographique 3D centrée sur la géolocalisation utilisateur.",
+  "description": "Application Next.js de scanner GPS topographique open source centrée sur la géolocalisation utilisateur.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "mapbox-gl": "^3.23.1",
+    "maplibre-gl": "^5.24.0",
     "next": "^16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
