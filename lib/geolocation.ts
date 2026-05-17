@@ -11,15 +11,15 @@ export const PARIS_CENTER: GeoPoint = {
 };
 
 export const GEOLOCATION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: false,
-  timeout: 8000,
-  maximumAge: 120000,
+  enableHighAccuracy: true,
+  timeout: 20000,
+  maximumAge: 60000,
 };
 
 export const WATCH_GEOLOCATION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: false,
-  timeout: 30000,
-  maximumAge: 60000,
+  enableHighAccuracy: true,
+  timeout: 60000,
+  maximumAge: 10000,
 };
 
 export function getCurrentUserPosition(

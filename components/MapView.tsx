@@ -240,11 +240,11 @@ export function MapView() {
       }));
 
       try {
+        startLivePositionWatch();
         const position = await getCurrentUserPosition();
         const location = positionToGeoPoint(position);
 
         applyUserLocation(location, centerAfterResolve);
-        startLivePositionWatch();
       } catch (error) {
         const nextStatus = geolocationStatusFromError(error);
         const nextMessage = geolocationMessageFromError(error);
