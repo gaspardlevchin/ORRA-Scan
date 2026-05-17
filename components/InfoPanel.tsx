@@ -33,6 +33,18 @@ export function InfoPanel({ telemetry }: InfoPanelProps) {
         <DataRow label="Zoom" value={telemetry.zoom.toFixed(2)} />
         <DataRow label="Pitch" value={`${Math.round(telemetry.pitch)} deg`} />
         <DataRow
+          label="Cap GPS"
+          value={formatHeading(telemetry.userLocation?.heading)}
+        />
+        <DataRow
+          label="Vitesse"
+          value={formatSpeed(telemetry.userLocation?.speed)}
+        />
+        <DataRow
+          label="Précision"
+          value={formatAccuracy(telemetry.userLocation?.accuracy)}
+        />
+        <DataRow
           label="Altitude"
           value={formatAltitude(telemetry.userLocation?.altitude)}
         />
@@ -88,4 +100,28 @@ function formatAltitude(value: number | null | undefined): string {
   }
 
   return `${Math.round(value)} m`;
+}
+
+function formatAccuracy(value: number | null | undefined): string {
+  if (typeof value !== "number") {
+    return "Non disponible";
+  }
+
+  return `+/- ${Math.round(value)} m`;
+}
+
+function formatHeading(value: number | null | undefined): string {
+  if (typeof value !== "number") {
+    return "Non disponible";
+  }
+
+  return `${Math.round(value)} deg`;
+}
+
+function formatSpeed(value: number | null | undefined): string {
+  if (typeof value !== "number") {
+    return "Non disponible";
+  }
+
+  return `${Math.round(value * 3.6)} km/h`;
 }

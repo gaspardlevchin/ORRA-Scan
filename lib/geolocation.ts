@@ -5,6 +5,9 @@ export const PARIS_CENTER: GeoPoint = {
   longitude: 2.3522,
   altitude: null,
   accuracy: null,
+  heading: null,
+  speed: null,
+  timestamp: 0,
 };
 
 export const GEOLOCATION_OPTIONS: PositionOptions = {
@@ -25,12 +28,37 @@ export function getCurrentUserPosition(
   });
 }
 
+export function watchUserPosition(
+  onPosition: (position: GeolocationPosition) => void,
+  onError: (error: GeolocationPositionError) => void,
+  options: PositionOptions = GEOLOCATION_OPTIONS,
+): number | null {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return null;
+  }
+
+  return navigator.geolocation.watchPosition(onPosition, onError, options);
+}
+
+export function clearUserPositionWatch(watchId: number | null): void {
+  if (
+    watchId !== null &&
+    typeof navigator !== "undefined" &&
+    navigator.geolocation
+  ) {
+    navigator.geolocation.clearWatch(watchId);
+  }
+}
+
 export function positionToGeoPoint(position: GeolocationPosition): GeoPoint {
   return {
     latitude: position.coords.latitude,
     longitude: position.coords.longitude,
     altitude: position.coords.altitude,
     accuracy: position.coords.accuracy,
+    heading: position.coords.heading,
+    speed: position.coords.speed,
+    timestamp: position.timestamp,
   };
 }
 

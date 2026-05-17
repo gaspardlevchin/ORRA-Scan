@@ -5,6 +5,7 @@
   --border: rgba(93, 255, 192, 0.18);
   --border-strong: rgba(93, 255, 192, 0.38);
   --green: #54f6ba;
+  --green-hot: #a9ff66;
   --green-deep: #0d5f49;
   --cyan: #70e4ff;
   --amber: #f1c875;
@@ -58,6 +59,50 @@ button {
 .token-fallback {
   position: absolute;
   inset: 0;
+}
+
+.map-container {
+  overflow: hidden;
+}
+
+.map-container::before,
+.map-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.map-container::before {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 34%, rgba(84, 246, 186, 0.08) 58%, rgba(3, 7, 6, 0.8) 100%),
+    linear-gradient(90deg, rgba(83, 255, 173, 0.18), transparent 22%, transparent 78%, rgba(83, 255, 173, 0.13)),
+    linear-gradient(to bottom, rgba(166, 255, 115, 0.08), transparent 18%, transparent 82%, rgba(17, 90, 53, 0.18));
+  mix-blend-mode: screen;
+}
+
+.map-container::after {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(169, 255, 102, 0.08) 0,
+      rgba(169, 255, 102, 0.08) 1px,
+      transparent 1px,
+      transparent 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(84, 246, 186, 0.035) 0,
+      rgba(84, 246, 186, 0.035) 1px,
+      transparent 1px,
+      transparent 7px
+    );
+  opacity: 0.46;
+}
+
+.mapboxgl-canvas {
+  filter: saturate(0.82) hue-rotate(72deg) contrast(1.28) brightness(0.68);
 }
 
 .token-fallback {
@@ -124,9 +169,11 @@ button {
   gap: 12px;
   width: min(420px, calc(100vw - 36px));
   padding: 12px 14px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(169, 255, 102, 0.28);
   border-radius: 8px;
-  background: linear-gradient(90deg, rgba(4, 18, 15, 0.9), rgba(4, 12, 12, 0.7));
+  background:
+    linear-gradient(90deg, rgba(2, 20, 9, 0.94), rgba(4, 28, 18, 0.68)),
+    repeating-linear-gradient(90deg, rgba(169, 255, 102, 0.07) 0 1px, transparent 1px 8px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(14px);
 }
@@ -137,9 +184,9 @@ button {
   width: 36px;
   height: 36px;
   flex: 0 0 36px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid rgba(169, 255, 102, 0.58);
   border-radius: 50%;
-  color: var(--green);
+  color: var(--green-hot);
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -153,7 +200,7 @@ button {
   margin: 0;
   font-size: 0.92rem;
   line-height: 1.1;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -179,9 +226,11 @@ button {
 
 .info-panel,
 .control-panel {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(169, 255, 102, 0.22);
   border-radius: 8px;
-  background: var(--bg-panel);
+  background:
+    linear-gradient(180deg, rgba(2, 20, 9, 0.88), rgba(2, 11, 8, 0.74)),
+    repeating-linear-gradient(0deg, rgba(84, 246, 186, 0.04) 0 1px, transparent 1px 9px);
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
 }
@@ -248,10 +297,10 @@ button {
 
 .control-button {
   min-height: 44px;
-  border: 1px solid rgba(93, 255, 192, 0.2);
+  border: 1px solid rgba(169, 255, 102, 0.24);
   border-radius: 6px;
   color: var(--text);
-  background: rgba(6, 25, 21, 0.86);
+  background: rgba(4, 32, 16, 0.84);
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -262,8 +311,8 @@ button {
 
 .control-button:hover:not(:disabled) {
   border-color: var(--border-strong);
-  color: var(--green);
-  background: rgba(10, 47, 38, 0.88);
+  color: var(--green-hot);
+  background: rgba(16, 62, 25, 0.88);
 }
 
 .control-button:active:not(:disabled) {
@@ -285,36 +334,44 @@ button {
   left: 50%;
   top: 50%;
   z-index: 4;
-  width: min(48vmin, 420px);
-  aspect-ratio: 1;
+  width: min(86vw, 1080px);
+  height: min(62vh, 560px);
   pointer-events: none;
   transform: translate(-50%, -50%);
-  opacity: 0.78;
+  opacity: 0.9;
 }
 
 .radar-ring,
 .radar-core,
 .radar-sweep,
-.radar-axis {
+.radar-axis,
+.radar-horizon {
   position: absolute;
-  inset: 0;
 }
 
 .radar-ring {
+  left: 50%;
+  top: 50%;
+  width: min(42vmin, 390px);
+  aspect-ratio: 1;
   border: 1px solid rgba(84, 246, 186, 0.28);
   border-radius: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .radar-ring--mid {
-  inset: 22%;
+  width: min(28vmin, 260px);
 }
 
 .radar-ring--inner {
-  inset: 39%;
+  width: min(14vmin, 130px);
 }
 
 .radar-core {
-  inset: calc(50% - 4px);
+  left: calc(50% - 5px);
+  top: calc(50% - 5px);
+  width: 10px;
+  height: 10px;
   border: 1px solid var(--green);
   border-radius: 50%;
   box-shadow: 0 0 18px rgba(84, 246, 186, 0.7);
@@ -325,6 +382,10 @@ button {
   content: "";
   position: absolute;
   background: rgba(84, 246, 186, 0.35);
+}
+
+.radar-axis {
+  inset: 0;
 }
 
 .radar-axis::before {
@@ -342,6 +403,11 @@ button {
 }
 
 .radar-sweep {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(42vmin, 390px);
+  aspect-ratio: 1;
   border-radius: 50%;
   background: conic-gradient(
     from 16deg,
@@ -351,6 +417,106 @@ button {
   );
   animation: radar-spin 5.5s linear infinite;
   mix-blend-mode: screen;
+  transform-origin: 50% 50%;
+  translate: -50% -50%;
+}
+
+.radar-horizon {
+  left: 7%;
+  right: 7%;
+  top: 50%;
+  height: 1px;
+  background: rgba(169, 255, 102, 0.38);
+  box-shadow: 0 0 14px rgba(169, 255, 102, 0.36);
+}
+
+.radar-dots {
+  display: block;
+  width: 100%;
+  height: 9px;
+  margin-top: -4px;
+  background-image: radial-gradient(circle, rgba(169, 255, 102, 0.95) 0 2px, transparent 2px);
+  background-size: 20px 9px;
+  animation: horizon-flow 2.4s linear infinite;
+}
+
+.radar-target {
+  position: absolute;
+  top: 50%;
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(169, 255, 102, 0.78);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 22px rgba(169, 255, 102, 0.4);
+}
+
+.radar-target::before,
+.radar-target::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+}
+
+.radar-target::before {
+  left: 50%;
+  top: -12px;
+  width: 2px;
+  height: 80px;
+  transform: translateX(-50%);
+}
+
+.radar-target::after {
+  left: -12px;
+  top: 50%;
+  width: 80px;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.radar-target--left {
+  left: 19%;
+  color: rgba(255, 109, 109, 0.72);
+  border-color: rgba(255, 109, 109, 0.68);
+  box-shadow: 0 0 20px rgba(255, 109, 109, 0.42);
+}
+
+.radar-target--center {
+  left: 50%;
+  width: 72px;
+  height: 72px;
+  color: rgba(169, 255, 102, 0.85);
+}
+
+.radar-target--right {
+  left: 81%;
+  color: rgba(112, 228, 255, 0.7);
+  border-color: rgba(112, 228, 255, 0.65);
+}
+
+.radar-range {
+  position: absolute;
+  top: calc(50% + 46px);
+  color: rgba(218, 255, 202, 0.78);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  transform: translateX(-50%);
+}
+
+.radar-range--left {
+  left: 19%;
+  color: rgba(255, 109, 109, 0.86);
+}
+
+.radar-range--center {
+  left: 50%;
+  color: var(--green-hot);
+}
+
+.radar-range--right {
+  left: 81%;
+  color: rgba(112, 228, 255, 0.86);
 }
 
 .scan-vignette {
@@ -359,8 +525,94 @@ button {
   z-index: 3;
   pointer-events: none;
   background:
-    linear-gradient(to bottom, rgba(2, 6, 5, 0.64), transparent 24%),
-    linear-gradient(to top, rgba(2, 6, 5, 0.78), transparent 32%);
+    linear-gradient(to bottom, rgba(0, 5, 2, 0.82), transparent 24%),
+    linear-gradient(to top, rgba(0, 6, 2, 0.9), transparent 35%),
+    radial-gradient(circle at 50% 50%, transparent 0 56%, rgba(0, 0, 0, 0.58) 100%);
+}
+
+.scanner-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(169, 255, 102, 0.11) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(169, 255, 102, 0.09) 1px, transparent 1px),
+    linear-gradient(rgba(84, 246, 186, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(84, 246, 186, 0.06) 1px, transparent 1px);
+  background-size:
+    96px 96px,
+    96px 96px,
+    12px 12px,
+    12px 12px;
+  mask-image: radial-gradient(circle at 50% 50%, black 0 62%, transparent 88%);
+}
+
+.scanner-frame {
+  position: absolute;
+  inset: 18px;
+  z-index: 5;
+  pointer-events: none;
+  border: 1px solid rgba(169, 255, 102, 0.16);
+  box-shadow:
+    inset 0 0 28px rgba(84, 246, 186, 0.12),
+    0 0 42px rgba(84, 246, 186, 0.06);
+}
+
+.scanner-frame__corner {
+  position: absolute;
+  width: 74px;
+  height: 74px;
+  border-color: rgba(169, 255, 102, 0.78);
+}
+
+.scanner-frame__corner--tl {
+  left: -1px;
+  top: -1px;
+  border-left: 2px solid;
+  border-top: 2px solid;
+}
+
+.scanner-frame__corner--tr {
+  right: -1px;
+  top: -1px;
+  border-right: 2px solid;
+  border-top: 2px solid;
+}
+
+.scanner-frame__corner--br {
+  right: -1px;
+  bottom: -1px;
+  border-right: 2px solid;
+  border-bottom: 2px solid;
+}
+
+.scanner-frame__corner--bl {
+  left: -1px;
+  bottom: -1px;
+  border-left: 2px solid;
+  border-bottom: 2px solid;
+}
+
+.scanner-frame__rail {
+  position: absolute;
+  top: 24%;
+  width: 4px;
+  height: 52%;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(169, 255, 102, 0.48) 0 12px,
+      transparent 12px 24px
+    );
+}
+
+.scanner-frame__rail--left {
+  left: 8px;
+}
+
+.scanner-frame__rail--right {
+  right: 8px;
 }
 
 .mapboxgl-ctrl-attrib {
@@ -402,6 +654,12 @@ button {
 @keyframes radar-spin {
   to {
     transform: rotate(1turn);
+  }
+}
+
+@keyframes horizon-flow {
+  to {
+    background-position-x: 20px;
   }
 }
 
@@ -457,7 +715,40 @@ button {
   }
 
   .radar-overlay {
-    width: min(62vmin, 300px);
+    width: min(96vw, 680px);
+    height: min(54vh, 420px);
+  }
+
+  .scanner-frame {
+    inset: 8px;
+  }
+
+  .scanner-frame__corner {
+    width: 46px;
+    height: 46px;
+  }
+
+  .radar-target {
+    width: 42px;
+    height: 42px;
+  }
+
+  .radar-target::before {
+    height: 62px;
+  }
+
+  .radar-target::after {
+    width: 62px;
+  }
+
+  .radar-target--center {
+    width: 56px;
+    height: 56px;
+  }
+
+  .radar-range {
+    top: calc(50% + 36px);
+    font-size: 0.62rem;
   }
 }
 

@@ -12,6 +12,9 @@ export type GeoPoint = {
   longitude: number;
   altitude: number | null;
   accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  timestamp: number;
 };
 
 export type MapCenter = {

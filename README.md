@@ -1,8 +1,8 @@
 # Terrain Scan App
 
-Application web professionnelle en Next.js + TypeScript pour visualiser une carte topographique 3D centrée automatiquement sur la position de l'utilisateur.
+Application web professionnelle en Next.js + TypeScript pour visualiser une carte topographique 3D mondiale centrée automatiquement sur la position de l'utilisateur.
 
-L'interface est sombre, minimaliste et orientée lecture terrain : carte Mapbox GL JS, relief 3D, bâtiments extrudés, viseur radar, coordonnées GPS en temps réel et contrôles essentiels.
+L'interface reprend un langage de scanner GPS : carte Mapbox GL JS, relief 3D, contours topographiques, grille verte, ligne de visée, cibles radar, coordonnées GPS live et contrôles essentiels.
 
 ## Fonctionnalités
 
@@ -10,10 +10,12 @@ L'interface est sombre, minimaliste et orientée lecture terrain : carte Mapbox 
 - Centrage automatique sur la position utilisateur si l'autorisation est accordée.
 - Repli automatique sur Paris si la géolocalisation est refusée, indisponible ou non supportée.
 - Carte Mapbox sombre avec terrain 3D et ombrage topographique.
+- Contours topographiques globaux issus des données terrain Mapbox.
 - Bâtiments 3D extrudés à partir des données Mapbox.
 - Marqueur de position utilisateur.
-- Viseur central type scanner/radar.
-- Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, altitude disponible et statut de géolocalisation.
+- Viseur central type scanner/radar avec grille et ligne de visée.
+- Suivi GPS live via l'API Geolocation du navigateur.
+- Panneau d'informations : centre de carte, position utilisateur, zoom, pitch, cap, vitesse, précision, altitude disponible et statut de géolocalisation.
 - Contrôles : me localiser, activer/désactiver le terrain, activer/désactiver les bâtiments, plein écran.
 - Interface responsive desktop et mobile.
 

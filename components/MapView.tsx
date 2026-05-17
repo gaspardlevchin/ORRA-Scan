@@ -6,11 +6,13 @@ import { ControlPanel } from "@/components/ControlPanel";
 import { InfoPanel } from "@/components/InfoPanel";
 import { RadarOverlay } from "@/components/RadarOverlay";
 import {
+  clearUserPositionWatch,
   geolocationMessageFromError,
   geolocationStatusFromError,
   getCurrentUserPosition,
   PARIS_CENTER,
   positionToGeoPoint,
+  watchUserPosition,
 } from "@/lib/geolocation";
 import {
   addBuildings,
@@ -46,6 +48,7 @@ export function MapView() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const watchPositionRef = useRef<number | null>(null);
   const centeredOnUserRef = useRef(false);
   const initialLocationRequestRef = useRef(false);
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
@@ -103,13 +106,64 @@ export function MapView() {
       center: [location.longitude, location.latitude],
       zoom: Math.max(map.getZoom(), DEFAULT_ZOOM),
       pitch: DEFAULT_PITCH,
-      bearing: DEFAULT_BEARING,
+      bearing:
+        typeof location.heading === "number" ? location.heading : DEFAULT_BEARING,
       duration: 1400,
       essential: true,
     });
 
     return true;
   }, []);
+
+  const applyUserLocation = useCallback(
+    (location: GeoPoint, centerAfterResolve: boolean) => {
+      setTelemetry((current) => ({
+        ...current,
+        userLocation: location,
+        geolocationStatus: "granted",
+        geolocationError: null,
+      }));
+      setUserMarker(location);
+
+      if (centerAfterResolve) {
+        centeredOnUserRef.current = centerMapOn(location);
+      }
+    },
+    [centerMapOn, setUserMarker],
+  );
+
+  const startLivePositionWatch = useCallback(() => {
+    if (watchPositionRef.current !== null) {
+      return;
+    }
+
+    const watchId = watchUserPosition(
+      (position) => {
+        const location = positionToGeoPoint(position);
+
+        applyUserLocation(location, !centeredOnUserRef.current);
+      },
+      (error) => {
+        setTelemetry((current) => ({
+          ...current,
+          geolocationStatus: geolocationStatusFromError(error),
+          geolocationError: geolocationMessageFromError(error),
+        }));
+      },
+    );
+
+    if (watchId === null) {
+      setTelemetry((current) => ({
+        ...current,
+        geolocationStatus: "unsupported",
+        geolocationError:
+          "La géolocalisation n'est pas prise en charge par ce navigateur.",
+      }));
+      return;
+    }
+
+    watchPositionRef.current = watchId;
+  }, [applyUserLocation]);
 
   const requestLocation = useCallback(
     async (centerAfterResolve = true) => {
@@ -123,17 +177,8 @@ export function MapView() {
         const position = await getCurrentUserPosition();
         const location = positionToGeoPoint(position);
 
-        setTelemetry((current) => ({
-          ...current,
-          userLocation: location,
-          geolocationStatus: "granted",
-          geolocationError: null,
-        }));
-        setUserMarker(location);
-
-        if (centerAfterResolve) {
-          centeredOnUserRef.current = centerMapOn(location);
-        }
+        applyUserLocation(location, centerAfterResolve);
+        startLivePositionWatch();
       } catch (error) {
         setTelemetry((current) => ({
           ...current,
@@ -146,7 +191,7 @@ export function MapView() {
         }
       }
     },
-    [centerMapOn, setUserMarker],
+    [applyUserLocation, centerMapOn, startLivePositionWatch],
   );
 
   useEffect(() => {
@@ -226,6 +271,13 @@ export function MapView() {
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearUserPositionWatch(watchPositionRef.current);
+      watchPositionRef.current = null;
     };
   }, []);
 
@@ -312,13 +364,21 @@ export function MapView() {
         )}
         <div className="scan-vignette" />
         <RadarOverlay />
+        <div className="scanner-frame" aria-hidden="true">
+          <span className="scanner-frame__corner scanner-frame__corner--tl" />
+          <span className="scanner-frame__corner scanner-frame__corner--tr" />
+          <span className="scanner-frame__corner scanner-frame__corner--br" />
+          <span className="scanner-frame__corner scanner-frame__corner--bl" />
+          <span className="scanner-frame__rail scanner-frame__rail--left" />
+          <span className="scanner-frame__rail scanner-frame__rail--right" />
+        </div>
       </section>
 
       <header className="scan-topbar">
-        <div className="scan-topbar__mark">TS</div>
+        <div className="scan-topbar__mark">OR</div>
         <div className="scan-topbar__title">
-          <h1>Terrain Scan</h1>
-          <p>Analyse terrain 3D • radar géospatial</p>
+          <h1>ORRA Scan</h1>
+          <p>GPS topographique mondial • relief 3D live</p>
         </div>
       </header>
 
