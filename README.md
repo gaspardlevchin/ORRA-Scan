@@ -74,6 +74,24 @@ NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
 
 Le fichier `vercel.json` indique explicitement que le framework est Next.js. Vercel détecte ensuite les commandes standard du projet.
 
+## Déploiement GitHub Pages
+
+Un workflow GitHub Actions est fourni dans `.github/workflows/deploy-github-pages.yml`.
+
+Pour publier l'application sur `https://gaspardlevchin.github.io/ORRA-Scan/` :
+
+1. Dans GitHub, ouvrez `Settings` > `Pages`.
+2. Dans `Build and deployment`, sélectionnez `GitHub Actions`.
+3. Dans `Settings` > `Secrets and variables` > `Actions`, ajoutez un secret :
+
+```bash
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_token_here
+```
+
+4. Poussez la branche `main`, ou lancez manuellement le workflow `Deploy GitHub Pages`.
+
+GitHub Pages sert l'application depuis le sous-chemin `/ORRA-Scan`. La configuration Next.js applique donc `basePath` et `assetPrefix` uniquement quand le build est lancé avec `GITHUB_PAGES=true`.
+
 ## Géolocalisation, localhost et HTTPS
 
 Les navigateurs n'autorisent la géolocalisation que dans des contextes sécurisés. Elle fonctionne donc :
