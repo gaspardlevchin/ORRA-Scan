@@ -48,7 +48,7 @@ const initialTelemetry: MapTelemetry = {
 export function MapView() {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const maplibreRef = useRef<typeof import("maplibre-gl").default | null>(null);
+  const maplibreRef = useRef<typeof import("maplibre-gl") | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<MapLibreMarker | null>(null);
   const watchPositionRef = useRef<number | null>(null);
@@ -291,7 +291,7 @@ export function MapView() {
       setMapError(null);
 
       try {
-        const maplibre = (await import("maplibre-gl")).default;
+        const maplibre = await import("maplibre-gl");
 
         if (cancelled || !mapContainerRef.current) {
           return;
