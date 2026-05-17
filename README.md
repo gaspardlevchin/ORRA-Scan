@@ -27,6 +27,8 @@ L'interface est sombre, minimaliste et orientée lecture terrain : carte Mapbox 
 
 ## Installation
 
+Prérequis recommandé : Node.js 22. Next.js reste compatible avec Node.js 20.9 ou plus récent.
+
 ```bash
 npm install
 ```

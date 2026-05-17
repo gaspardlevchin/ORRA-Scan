@@ -47,6 +47,7 @@ export function MapView() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const centeredOnUserRef = useRef(false);
+  const initialLocationRequestRef = useRef(false);
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
   const [mapReady, setMapReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -91,11 +92,11 @@ export function MapView() {
     markerRef.current.setLngLat([location.longitude, location.latitude]);
   }, []);
 
-  const centerMapOn = useCallback((location: GeoPoint) => {
+  const centerMapOn = useCallback((location: GeoPoint): boolean => {
     const map = mapRef.current;
 
     if (!map) {
-      return;
+      return false;
     }
 
     map.flyTo({
@@ -106,6 +107,8 @@ export function MapView() {
       duration: 1400,
       essential: true,
     });
+
+    return true;
   }, []);
 
   const requestLocation = useCallback(
@@ -129,8 +132,7 @@ export function MapView() {
         setUserMarker(location);
 
         if (centerAfterResolve) {
-          centeredOnUserRef.current = true;
-          centerMapOn(location);
+          centeredOnUserRef.current = centerMapOn(location);
         }
       } catch (error) {
         setTelemetry((current) => ({
@@ -148,6 +150,11 @@ export function MapView() {
   );
 
   useEffect(() => {
+    if (initialLocationRequestRef.current) {
+      return;
+    }
+
+    initialLocationRequestRef.current = true;
     void requestLocation(true);
   }, [requestLocation]);
 
