@@ -237,7 +237,6 @@ export function MapView() {
     }
 
     const map = new maplibregl.Map({
-      antialias: true,
       attributionControl: false,
       bearing: DEFAULT_BEARING,
       center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
