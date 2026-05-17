@@ -1,0 +1,30 @@
+{
+  "name": "terrain-scan-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Application Next.js de lecture topographique 3D centrée sur la géolocalisation utilisateur.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mapbox-gl": "^3.10.0",
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.20.0",
+    "eslint-config-next": "^15.2.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  }
+}
