@@ -28,11 +28,11 @@ type MapLibreRuntime = Pick<
   "AttributionControl" | "Map" | "Marker"
 >;
 
-const USER_ZOOM = 16.35;
-const USER_PITCH = 64;
-const DEFAULT_BEARING = -24;
-const INITIAL_ZOOM = 12.65;
-const INITIAL_PITCH = 48;
+const USER_ZOOM = 16.65;
+const USER_PITCH = 66;
+const DEFAULT_BEARING = -28;
+const INITIAL_ZOOM = 15.75;
+const INITIAL_PITCH = 64;
 
 const initialTelemetry: MapTelemetry = {
   center: {
@@ -45,7 +45,7 @@ const initialTelemetry: MapTelemetry = {
   zoom: INITIAL_ZOOM,
   pitch: INITIAL_PITCH,
   terrainEnabled: true,
-  buildingsEnabled: false,
+  buildingsEnabled: true,
   geolocationStatus: "idle",
   geolocationError: null,
 };
@@ -325,7 +325,11 @@ export function MapView() {
 
         activeMap = map;
         mapRef.current = map;
+        map.boxZoom.enable();
+        map.dragPan.enable();
         map.dragRotate.enable();
+        map.doubleClickZoom.enable();
+        map.scrollZoom.enable();
         map.touchZoomRotate.enableRotation();
         map.keyboard.enable();
 
@@ -449,6 +453,12 @@ export function MapView() {
 
       if (nextValue) {
         addOpenTopographyOverlay(map);
+        map.easeTo({
+          bearing: map.getBearing() || DEFAULT_BEARING,
+          pitch: Math.max(map.getPitch(), INITIAL_PITCH),
+          duration: 700,
+          essential: true,
+        });
       } else {
         removeOpenTopographyOverlay(map);
       }
@@ -470,6 +480,16 @@ export function MapView() {
     setTelemetry((current) => {
       const nextValue = !current.buildingsEnabled;
       setOpenBuildingsVisibility(map, nextValue);
+
+      if (nextValue) {
+        map.easeTo({
+          bearing: map.getBearing() || DEFAULT_BEARING,
+          pitch: USER_PITCH,
+          zoom: Math.max(map.getZoom(), USER_ZOOM),
+          duration: 900,
+          essential: true,
+        });
+      }
 
       return {
         ...current,
