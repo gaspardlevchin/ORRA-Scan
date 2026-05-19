@@ -605,15 +605,21 @@ export function MapView() {
             return;
           }
 
-          refreshTopographyGrid(map);
+          try {
+            refreshTopographyGrid(map);
 
-          if (initialTelemetry.terrainEnabled) {
-            addOpenTopographyOverlay(map);
-            void startDeviceOrientation();
+            if (initialTelemetry.terrainEnabled) {
+              addOpenTopographyOverlay(map);
+              void startDeviceOrientation();
+            }
+
+            setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
+            setOpenStreetVisibility(map, initialTelemetry.roadsEnabled);
+          } catch {
+            const retryTimerId = window.setTimeout(enableInitialOverlays, 360);
+
+            deferredCenterTimersRef.current.push(retryTimerId);
           }
-
-          setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
-          setOpenStreetVisibility(map, initialTelemetry.roadsEnabled);
         };
         const centerLoadedUserLocation = () => {
           const location = userLocationRef.current;
@@ -630,6 +636,11 @@ export function MapView() {
           const timerId = window.setTimeout(() => {
             centerLoadedUserLocation();
           }, delay);
+
+          deferredCenterTimersRef.current.push(timerId);
+        };
+        const scheduleMapExperience = (delay: number) => {
+          const timerId = window.setTimeout(initializeMapExperience, delay);
 
           deferredCenterTimersRef.current.push(timerId);
         };
@@ -654,6 +665,8 @@ export function MapView() {
 
         map.on("styledata", initializeMapExperience);
         map.on("load", initializeMapExperience);
+        scheduleMapExperience(80);
+        scheduleMapExperience(900);
 
         map.on("error", (event) => {
           const mapErrorEvent = event as { error?: { message?: string } };
