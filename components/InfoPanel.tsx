@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useState } from "react";
 import type { GeoPoint, GeolocationStatus, MapTelemetry } from "@/types/map";
 
 type InfoPanelProps = {
@@ -16,45 +19,61 @@ const statusLabels: Record<GeolocationStatus, string> = {
 };
 
 export function InfoPanel({ telemetry }: InfoPanelProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <aside className="info-panel" aria-label="Informations de lecture">
-      <p className="panel-kicker">Telemetry</p>
-      <div className="info-panel__grid">
-        <DataRow
-          label="CTR"
-          value={`${formatCoordinate(telemetry.center.latitude)}, ${formatCoordinate(
-            telemetry.center.longitude,
-          )}`}
-        />
-        <DataRow
-          label="GPS"
-          value={formatUserLocation(telemetry.userLocation)}
-        />
-        <DataRow
-          label="ALT"
-          value={`${formatAltitude(telemetry.centerElevation)} / ${formatAltitude(
-            telemetry.userElevation,
-          )}`}
-        />
-        <DataRow
-          label="VIEW"
-          value={`${telemetry.zoom.toFixed(1)}z / ${Math.round(
-            telemetry.pitch,
-          )}deg`}
-        />
-        <DataRow
-          label="LOC"
-          value={
-            <span
-              className="status-value"
-              data-status={telemetry.geolocationStatus}
-              title={geolocationDetails(telemetry)}
-            >
-              {statusLabels[telemetry.geolocationStatus]}
-            </span>
-          }
-        />
-      </div>
+    <aside
+      className="info-panel"
+      data-collapsed={collapsed}
+      aria-label="Informations de lecture"
+    >
+      <button
+        className="info-panel__toggle"
+        type="button"
+        onClick={() => setCollapsed((current) => !current)}
+        aria-expanded={!collapsed}
+        aria-label="Afficher ou masquer les paramètres"
+      >
+        <span>Données</span>
+        <span className="info-panel__arrow" />
+      </button>
+
+      {!collapsed ? (
+        <div className="info-panel__grid">
+          <DataRow
+            label="Centre"
+            value={`${formatCoordinate(telemetry.center.latitude)}, ${formatCoordinate(
+              telemetry.center.longitude,
+            )}`}
+          />
+          <DataRow label="Position" value={formatUserLocation(telemetry.userLocation)} />
+          <DataRow
+            label="Altitude"
+            value={`${formatAltitude(telemetry.centerElevation)} / ${formatAltitude(
+              telemetry.userElevation,
+            )}`}
+          />
+          <DataRow
+            label="Vue"
+            value={`${telemetry.zoom.toFixed(1)}z / ${Math.round(
+              telemetry.pitch,
+            )}deg`}
+          />
+          <DataRow label="Cap" value={`${Math.round(telemetry.bearing)}deg`} />
+          <DataRow
+            label="GPS"
+            value={
+              <span
+                className="status-value"
+                data-status={telemetry.geolocationStatus}
+                title={geolocationDetails(telemetry)}
+              >
+                {statusLabels[telemetry.geolocationStatus]}
+              </span>
+            }
+          />
+        </div>
+      ) : null}
     </aside>
   );
 }

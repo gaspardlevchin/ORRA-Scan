@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ControlPanel } from "@/components/ControlPanel";
 import { InfoPanel } from "@/components/InfoPanel";
-import { RadarOverlay } from "@/components/RadarOverlay";
 import { SearchPanel } from "@/components/SearchPanel";
 import { getOpenElevation } from "@/lib/elevation";
 import {
@@ -22,6 +21,8 @@ import {
   removeOpenTopographyOverlay,
   setRouteOverlay,
   setOpenBuildingsVisibility,
+  setOpenStreetVisibility,
+  updateTopographyGrid,
 } from "@/lib/open-maps";
 import { getOpenRoute, splitRouteAtPoint } from "@/lib/routing";
 import { searchOpenPlaces } from "@/lib/search";
@@ -49,7 +50,7 @@ type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
 };
 
 const TOPO_ZOOM = 17.25;
-const TOPO_PITCH = 76;
+const TOPO_PITCH = 82;
 const GPS_OVERVIEW_ZOOM = 15.1;
 const GPS_OVERVIEW_PITCH = 28;
 const DEFAULT_BEARING = -28;
@@ -66,8 +67,10 @@ const initialTelemetry: MapTelemetry = {
   userElevation: null,
   zoom: INITIAL_ZOOM,
   pitch: INITIAL_PITCH,
+  bearing: DEFAULT_BEARING,
   terrainEnabled: true,
   buildingsEnabled: true,
+  roadsEnabled: true,
   geolocationStatus: "idle",
   geolocationError: null,
 };
@@ -102,7 +105,6 @@ export function MapView() {
   const [telemetry, setTelemetry] = useState<MapTelemetry>(initialTelemetry);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("topo");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
@@ -120,6 +122,7 @@ export function MapView() {
       },
       zoom: map.getZoom(),
       pitch: map.getPitch(),
+      bearing: normalizeBearing(map.getBearing()),
     }));
   }, []);
 
@@ -188,6 +191,23 @@ export function MapView() {
     [],
   );
 
+  const refreshTopographyGrid = useCallback((map: MapLibreMap) => {
+    if (!map.isStyleLoaded()) {
+      return;
+    }
+
+    const center = map.getCenter();
+
+    updateTopographyGrid(
+      map,
+      {
+        latitude: center.lat,
+        longitude: center.lng,
+      },
+      map.getZoom(),
+    );
+  }, []);
+
   const centerMapOn = useCallback((location: GeoPoint): boolean => {
     const map = mapRef.current;
 
@@ -207,6 +227,21 @@ export function MapView() {
     });
 
     return true;
+  }, []);
+
+  const rotateMapBy = useCallback((delta: number) => {
+    const map = mapRef.current;
+
+    if (!map) {
+      return;
+    }
+
+    topoTrackingRef.current = false;
+    map.easeTo({
+      bearing: map.getBearing() + delta,
+      duration: 280,
+      essential: true,
+    });
   }, []);
 
   const centerGpsOverviewOn = useCallback((location: GeoPoint): boolean => {
@@ -480,6 +515,7 @@ export function MapView() {
 
     let cancelled = false;
     let activeMap: MapLibreMap | null = null;
+    let gestureChangeHandler: ((event: Event) => void) | null = null;
 
     const loadMap = async () => {
       setMapError(null);
@@ -530,16 +566,32 @@ export function MapView() {
         );
 
         const handleMapUpdate = () => updateTelemetryFromMap(map);
+        gestureChangeHandler = (event: Event) => {
+          const gestureEvent = event as Event & { rotation?: number };
+
+          if (typeof gestureEvent.rotation !== "number") {
+            return;
+          }
+
+          event.preventDefault();
+          topoTrackingRef.current = false;
+          map.rotateTo(map.getBearing() + gestureEvent.rotation * 0.35, {
+            duration: 0,
+          });
+        };
         const enableInitialOverlays = () => {
           if (mapRef.current !== map) {
             return;
           }
+
+          refreshTopographyGrid(map);
 
           if (initialTelemetry.terrainEnabled) {
             addOpenTopographyOverlay(map);
           }
 
           setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
+          setOpenStreetVisibility(map, initialTelemetry.roadsEnabled);
         };
 
         map.on("load", () => {
@@ -568,7 +620,17 @@ export function MapView() {
         });
 
         map.on("move", handleMapUpdate);
+        map.getCanvasContainer().addEventListener(
+          "gesturechange",
+          gestureChangeHandler,
+        );
         map.on("dragstart", () => {
+          topoTrackingRef.current = false;
+        });
+        map.on("rotatestart", () => {
+          topoTrackingRef.current = false;
+        });
+        map.on("pitchstart", () => {
           topoTrackingRef.current = false;
         });
         map.on("moveend", () => {
@@ -577,6 +639,7 @@ export function MapView() {
           }
 
           const center = map.getCenter();
+          refreshTopographyGrid(map);
 
           centerElevationTimerRef.current = window.setTimeout(() => {
             void refreshElevation(
@@ -620,6 +683,11 @@ export function MapView() {
         );
         orientationHandlerRef.current = null;
       }
+      if (activeMap && gestureChangeHandler) {
+        activeMap
+          .getCanvasContainer()
+          .removeEventListener("gesturechange", gestureChangeHandler);
+      }
       if (activeMap) {
         clearRouteOverlay(activeMap);
       }
@@ -633,7 +701,7 @@ export function MapView() {
       mapReadyRef.current = false;
       setMapReady(false);
     };
-  }, [refreshElevation, updateTelemetryFromMap]);
+  }, [refreshElevation, refreshTopographyGrid, updateTelemetryFromMap]);
 
   useEffect(() => {
     if (
@@ -645,19 +713,6 @@ export function MapView() {
       centeredOnUserRef.current = centerMapOn(telemetry.userLocation);
     }
   }, [centerMapOn, mapReady, setUserMarker, telemetry.userLocation]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === shellRef.current);
-      window.setTimeout(() => mapRef.current?.resize(), 80);
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -822,6 +877,7 @@ export function MapView() {
       !telemetry.terrainEnabled || currentViewModeRef.current !== "topo";
 
     if (shouldEnterTopo) {
+      refreshTopographyGrid(map);
       addOpenTopographyOverlay(map);
       topoTrackingRef.current = true;
       currentViewModeRef.current = "topo";
@@ -850,6 +906,25 @@ export function MapView() {
       ...current,
       terrainEnabled: shouldEnterTopo,
     }));
+  };
+
+  const handleRoadsToggle = () => {
+    const map = mapRef.current;
+
+    if (!map || !mapReady) {
+      return;
+    }
+
+    setTelemetry((current) => {
+      const nextValue = !current.roadsEnabled;
+
+      setOpenStreetVisibility(map, nextValue);
+
+      return {
+        ...current,
+        roadsEnabled: nextValue,
+      };
+    });
   };
 
   const handleBuildingsToggle = () => {
@@ -888,29 +963,6 @@ export function MapView() {
     });
   };
 
-  const handleFullscreenToggle = async () => {
-    const shell = shellRef.current;
-
-    if (!shell) {
-      return;
-    }
-
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      } else {
-        await shell.requestFullscreen();
-      }
-
-      mapRef.current?.resize();
-    } catch {
-      setTelemetry((current) => ({
-        ...current,
-        geolocationError: "Le mode plein écran est indisponible.",
-      }));
-    }
-  };
-
   return (
     <main className="scan-app" ref={shellRef}>
       <section className="map-stage" aria-label="Carte topographique 3D">
@@ -921,7 +973,6 @@ export function MapView() {
           </div>
         ) : null}
         <div className="scan-vignette" />
-        <RadarOverlay />
       </section>
 
       <SearchPanel
@@ -935,28 +986,42 @@ export function MapView() {
         onClearRoute={handleClearRoute}
       />
 
-      <header className="scan-topbar" data-view-mode={viewMode}>
-        <div className="scan-topbar__mark">ORRA</div>
-        <span
-          className="scan-topbar__status"
-          data-status={telemetry.geolocationStatus}
+      <div className="compass-rose" aria-label="Rose des vents">
+        <button
+          className="compass-rose__turn compass-rose__turn--left"
+          type="button"
+          onClick={() => rotateMapBy(-18)}
+          aria-label="Tourner à gauche"
+        />
+        <div
+          className="compass-rose__dial"
+          style={{ transform: `rotate(${-telemetry.bearing}deg)` }}
         >
-          {telemetry.geolocationStatus === "granted" ? "GPS" : "IDLE"}
-        </span>
-      </header>
+          <span>N</span>
+          <span>E</span>
+          <span>S</span>
+          <span>W</span>
+        </div>
+        <button
+          className="compass-rose__turn compass-rose__turn--right"
+          type="button"
+          onClick={() => rotateMapBy(18)}
+          aria-label="Tourner à droite"
+        />
+      </div>
 
       <div className="panel-stack">
         <InfoPanel telemetry={telemetry} />
         <ControlPanel
           topoModeActive={telemetry.terrainEnabled && viewMode === "topo"}
           buildingsEnabled={telemetry.buildingsEnabled}
-          isFullscreen={isFullscreen}
+          roadsEnabled={telemetry.roadsEnabled}
           mapReady={mapReady}
           geolocationStatus={telemetry.geolocationStatus}
           onLocate={() => void handleGpsOverview()}
           onToggleTerrain={handleTerrainToggle}
           onToggleBuildings={handleBuildingsToggle}
-          onToggleFullscreen={() => void handleFullscreenToggle()}
+          onToggleRoads={handleRoadsToggle}
         />
       </div>
 
@@ -984,6 +1049,10 @@ function browserSupportsWebGL(): boolean {
   } catch {
     return false;
   }
+}
+
+function normalizeBearing(value: number): number {
+  return ((value % 360) + 360) % 360;
 }
 
 function getCoordinateBounds(

@@ -29,8 +29,10 @@ export type MapTelemetry = {
   userElevation: number | null;
   zoom: number;
   pitch: number;
+  bearing: number;
   terrainEnabled: boolean;
   buildingsEnabled: boolean;
+  roadsEnabled: boolean;
   geolocationStatus: GeolocationStatus;
   geolocationError: string | null;
 };

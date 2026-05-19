@@ -3,25 +3,25 @@ import type { GeolocationStatus } from "@/types/map";
 type ControlPanelProps = {
   topoModeActive: boolean;
   buildingsEnabled: boolean;
-  isFullscreen: boolean;
+  roadsEnabled: boolean;
   mapReady: boolean;
   geolocationStatus: GeolocationStatus;
   onLocate: () => void;
   onToggleTerrain: () => void;
   onToggleBuildings: () => void;
-  onToggleFullscreen: () => void;
+  onToggleRoads: () => void;
 };
 
 export function ControlPanel({
   topoModeActive,
   buildingsEnabled,
-  isFullscreen,
+  roadsEnabled,
   mapReady,
   geolocationStatus,
   onLocate,
   onToggleTerrain,
   onToggleBuildings,
-  onToggleFullscreen,
+  onToggleRoads,
 }: ControlPanelProps) {
   const isLocating = geolocationStatus === "requesting";
 
@@ -62,12 +62,13 @@ export function ControlPanel({
       <button
         className="control-button"
         type="button"
-        data-active={isFullscreen}
-        onClick={onToggleFullscreen}
-        aria-label="Plein écran"
-        title="Plein écran"
+        data-active={roadsEnabled}
+        onClick={onToggleRoads}
+        disabled={!mapReady}
+        aria-label="Activer ou désactiver les rues"
+        title="Rues"
       >
-        FULL
+        RUES
       </button>
     </div>
   );

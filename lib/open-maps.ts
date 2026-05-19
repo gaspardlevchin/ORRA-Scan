@@ -12,12 +12,23 @@ export const ORRA_TERRAIN_SOURCE_ID = "orra-terrain-dem";
 export const ORRA_TERRAIN_LAYER_ID = "orra-terrain-shade";
 export const ORRA_BUILDING_FOOTPRINT_LAYER_ID = "orra-building-footprint";
 export const ORRA_BUILDINGS_LAYER_ID = "orra-open-buildings";
+export const ORRA_TOPO_GRID_SOURCE_ID = "orra-topography-grid";
+export const ORRA_TOPO_GRID_NEAR_LAYER_ID = "orra-topography-grid-near";
+export const ORRA_TOPO_GRID_FAR_LAYER_ID = "orra-topography-grid-far";
 export const ORRA_ROUTE_SOURCE_ID = "orra-route";
 export const ORRA_ROUTE_TRAVELED_LAYER_ID = "orra-route-traveled";
 export const ORRA_ROUTE_AHEAD_LAYER_ID = "orra-route-ahead";
 
 const BUILDING_SOURCE_LAYER = "building";
 const BUILDING_SOURCE_LAYER_NAMES = ["building", "buildings"];
+const STREET_LAYER_IDS = [
+  "waterway",
+  "road-major",
+  "road-secondary",
+  "road-minor",
+  "rail",
+  "boundary",
+];
 
 export const OPENFREE_MAP_STYLE: StyleSpecification = {
   version: 8,
@@ -285,11 +296,19 @@ export function addOpenTopographyOverlay(map: Map): void {
   }
 
   setLayerVisibility(map, ORRA_TERRAIN_LAYER_ID, true);
+  setTopographyGridVisibility(map, true);
 }
 
 export function removeOpenTopographyOverlay(map: Map): void {
   map.setTerrain(null);
   setLayerVisibility(map, ORRA_TERRAIN_LAYER_ID, false);
+  setTopographyGridVisibility(map, false);
+}
+
+export function setOpenStreetVisibility(map: Map, visible: boolean): void {
+  for (const layerId of STREET_LAYER_IDS) {
+    setLayerVisibility(map, layerId, visible);
+  }
 }
 
 export function addOpenBuildings(map: Map): void {
@@ -418,6 +437,20 @@ function firstSymbolLayerId(map: Map): string | undefined {
     ?.id;
 }
 
+type TopographyGridGeoJson = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: {
+      proximity: "near" | "far";
+    };
+    geometry: {
+      type: "LineString";
+      coordinates: LngLatTuple[];
+    };
+  }>;
+};
+
 type RouteGeoJson = {
   type: "FeatureCollection";
   features: Array<{
@@ -432,6 +465,71 @@ type RouteGeoJson = {
   }>;
 };
 
+export function updateTopographyGrid(
+  map: Map,
+  center: { latitude: number; longitude: number },
+  zoom: number,
+): void {
+  const gridData = createTopographyGrid(center, zoom);
+  const existingSource = map.getSource(ORRA_TOPO_GRID_SOURCE_ID);
+  const beforeLayerId = map.getLayer(ORRA_BUILDING_FOOTPRINT_LAYER_ID)
+    ? ORRA_BUILDING_FOOTPRINT_LAYER_ID
+    : undefined;
+
+  if (isGeoJsonSource<TopographyGridGeoJson>(existingSource)) {
+    existingSource.setData(gridData);
+  } else {
+    map.addSource(ORRA_TOPO_GRID_SOURCE_ID, {
+      type: "geojson",
+      data: gridData,
+    } satisfies StyleSourceSpecification);
+  }
+
+  if (!map.getLayer(ORRA_TOPO_GRID_FAR_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: ORRA_TOPO_GRID_FAR_LAYER_ID,
+        type: "line",
+        source: ORRA_TOPO_GRID_SOURCE_ID,
+        filter: ["==", ["get", "proximity"], "far"],
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#e26f22",
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.2, 17, 0.72],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 18, 2.2],
+          "line-blur": 0.14,
+        },
+      },
+      beforeLayerId,
+    );
+  }
+
+  if (!map.getLayer(ORRA_TOPO_GRID_NEAR_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: ORRA_TOPO_GRID_NEAR_LAYER_ID,
+        type: "line",
+        source: ORRA_TOPO_GRID_SOURCE_ID,
+        filter: ["==", ["get", "proximity"], "near"],
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+        paint: {
+          "line-color": "#fffaf0",
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.34, 17, 0.92],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.85, 18, 2.55],
+          "line-blur": 0.1,
+        },
+      },
+      beforeLayerId,
+    );
+  }
+}
+
 export function setRouteOverlay(
   map: Map,
   route: { traveled: LngLatTuple[]; ahead: LngLatTuple[] },
@@ -439,7 +537,7 @@ export function setRouteOverlay(
   const routeData = createRouteFeatureCollection(route);
   const existingSource = map.getSource(ORRA_ROUTE_SOURCE_ID);
 
-  if (isGeoJsonSource(existingSource)) {
+  if (isGeoJsonSource<RouteGeoJson>(existingSource)) {
     existingSource.setData(routeData);
   } else {
     map.addSource(ORRA_ROUTE_SOURCE_ID, {
@@ -503,6 +601,99 @@ export function clearRouteOverlay(map: Map): void {
   }
 }
 
+function setTopographyGridVisibility(map: Map, visible: boolean): void {
+  setLayerVisibility(map, ORRA_TOPO_GRID_NEAR_LAYER_ID, visible);
+  setLayerVisibility(map, ORRA_TOPO_GRID_FAR_LAYER_ID, visible);
+}
+
+function createTopographyGrid(
+  center: { latitude: number; longitude: number },
+  zoom: number,
+): TopographyGridGeoJson {
+  const spacingMeters = gridSpacingMeters(zoom);
+  const halfCount = 7;
+  const lineHalfLengthMeters = spacingMeters * halfCount;
+  const latitudeStep = metersToLatitude(spacingMeters);
+  const longitudeStep = metersToLongitude(spacingMeters, center.latitude);
+  const latitudeSpan = metersToLatitude(lineHalfLengthMeters);
+  const longitudeSpan = metersToLongitude(lineHalfLengthMeters, center.latitude);
+  const features: TopographyGridGeoJson["features"] = [];
+
+  for (let index = -halfCount; index <= halfCount; index += 1) {
+    const proximity = Math.abs(index) <= 1 ? "near" : "far";
+    const latitude = center.latitude + latitudeStep * index;
+    const longitude = center.longitude + longitudeStep * index;
+
+    features.push({
+      type: "Feature",
+      properties: { proximity },
+      geometry: {
+        type: "LineString",
+        coordinates: interpolateLine(
+          [center.longitude - longitudeSpan, latitude],
+          [center.longitude + longitudeSpan, latitude],
+        ),
+      },
+    });
+
+    features.push({
+      type: "Feature",
+      properties: { proximity },
+      geometry: {
+        type: "LineString",
+        coordinates: interpolateLine(
+          [longitude, center.latitude - latitudeSpan],
+          [longitude, center.latitude + latitudeSpan],
+        ),
+      },
+    });
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+}
+
+function gridSpacingMeters(zoom: number): number {
+  if (zoom >= 17.5) {
+    return 24;
+  }
+
+  if (zoom >= 16) {
+    return 42;
+  }
+
+  if (zoom >= 14) {
+    return 95;
+  }
+
+  return 220;
+}
+
+function interpolateLine(from: LngLatTuple, to: LngLatTuple): LngLatTuple[] {
+  const steps = 48;
+
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const progress = index / steps;
+
+    return [
+      from[0] + (to[0] - from[0]) * progress,
+      from[1] + (to[1] - from[1]) * progress,
+    ];
+  });
+}
+
+function metersToLatitude(meters: number): number {
+  return meters / 111320;
+}
+
+function metersToLongitude(meters: number, latitude: number): number {
+  const latitudeScale = Math.max(Math.cos((latitude * Math.PI) / 180), 0.18);
+
+  return meters / (111320 * latitudeScale);
+}
+
 function createRouteFeatureCollection(route: {
   traveled: LngLatTuple[];
   ahead: LngLatTuple[];
@@ -539,9 +730,9 @@ function createRouteFeature(
   };
 }
 
-function isGeoJsonSource(
+function isGeoJsonSource<TData extends TopographyGridGeoJson | RouteGeoJson>(
   source: unknown,
-): source is { setData: (data: RouteGeoJson) => void } {
+): source is { setData: (data: TData) => void } {
   return (
     typeof source === "object" &&
     source !== null &&
