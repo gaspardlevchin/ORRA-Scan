@@ -2,18 +2,32 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
-import type { GeoPoint, GeolocationStatus, MapTelemetry } from "@/types/map";
+import type {
+  GeoPoint,
+  GeolocationStatus,
+  MapTelemetry,
+  OrientationStatus,
+} from "@/types/map";
 
 type InfoPanelProps = {
   telemetry: MapTelemetry;
 };
 
-const statusLabels: Record<GeolocationStatus, string> = {
+const geolocationStatusLabels: Record<GeolocationStatus, string> = {
   idle: "idle",
   requesting: "...",
   granted: "on",
   denied: "off",
   unavailable: "n/a",
+  unsupported: "n/a",
+  error: "err",
+};
+
+const orientationStatusLabels: Record<OrientationStatus, string> = {
+  idle: "idle",
+  requesting: "...",
+  active: "on",
+  manual: "manuel",
   unsupported: "n/a",
   error: "err",
 };
@@ -61,6 +75,18 @@ export function InfoPanel({ telemetry }: InfoPanelProps) {
           />
           <DataRow label="Cap" value={`${Math.round(telemetry.bearing)}deg`} />
           <DataRow
+            label="Gyro"
+            value={
+              <span
+                className="status-value"
+                data-status={telemetry.orientationStatus}
+                title={orientationDetails(telemetry.orientationStatus)}
+              >
+                {orientationStatusLabels[telemetry.orientationStatus]}
+              </span>
+            }
+          />
+          <DataRow
             label="GPS"
             value={
               <span
@@ -68,7 +94,7 @@ export function InfoPanel({ telemetry }: InfoPanelProps) {
                 data-status={telemetry.geolocationStatus}
                 title={geolocationDetails(telemetry)}
               >
-                {statusLabels[telemetry.geolocationStatus]}
+                {geolocationStatusLabels[telemetry.geolocationStatus]}
               </span>
             }
           />
@@ -133,4 +159,20 @@ function geolocationDetails(telemetry: MapTelemetry): string | undefined {
   ].filter(Boolean);
 
   return details.length > 0 ? details.join(" | ") : undefined;
+}
+
+function orientationDetails(status: OrientationStatus): string | undefined {
+  if (status === "active") {
+    return "Orientation appareil active en mode topo.";
+  }
+
+  if (status === "manual") {
+    return "Orientation appareil refusée ou non disponible. Rotation manuelle.";
+  }
+
+  if (status === "unsupported") {
+    return "Ce navigateur ne fournit pas le gyroscope au site.";
+  }
+
+  return undefined;
 }

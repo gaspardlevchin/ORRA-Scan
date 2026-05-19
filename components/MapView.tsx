@@ -25,6 +25,7 @@ import {
   setOpenBuildingsVisibility,
   setOpenStreetVisibility,
   setUserPositionOverlay,
+  updateOpenMapLighting,
   updateTopographyGrid,
 } from "@/lib/open-maps";
 import { getOpenRoute, splitRouteAtPoint } from "@/lib/routing";
@@ -77,6 +78,7 @@ const initialTelemetry: MapTelemetry = {
   buildingsEnabled: true,
   roadsEnabled: true,
   geolocationStatus: "idle",
+  orientationStatus: "idle",
   geolocationError: null,
 };
 
@@ -102,7 +104,7 @@ export function MapView() {
   const positionPulseFrameRef = useRef<number | null>(null);
   const positionPulseLastFrameRef = useRef(0);
   const orientationHandlerRef = useRef<
-    ((event: DeviceOrientationEvent) => void) | null
+    ((event: Event) => void) | null
   >(null);
   const centeredOnUserRef = useRef(false);
   const initialLocationRequestRef = useRef(false);
@@ -467,15 +469,31 @@ export function MapView() {
   );
 
   const startDeviceOrientation = useCallback(async () => {
-    if (
-      typeof window === "undefined" ||
-      !("DeviceOrientationEvent" in window) ||
-      orientationEnabledRef.current
-    ) {
-      return;
+    if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) {
+      setTelemetry((current) => ({
+        ...current,
+        orientationStatus: "unsupported",
+        geolocationError:
+          "Gyroscope indisponible sur ce navigateur. Navigation topo en mode manuel.",
+      }));
+      return false;
+    }
+
+    if (orientationEnabledRef.current) {
+      topoTrackingRef.current = true;
+      setTelemetry((current) => ({
+        ...current,
+        orientationStatus: "active",
+      }));
+      return true;
     }
 
     try {
+      setTelemetry((current) => ({
+        ...current,
+        orientationStatus: "requesting",
+      }));
+
       const OrientationEventConstructor =
         (window as unknown as {
           DeviceOrientationEvent: DeviceOrientationEventConstructor;
@@ -487,27 +505,29 @@ export function MapView() {
         if (permission !== "granted") {
           setTelemetry((current) => ({
             ...current,
+            orientationStatus: "manual",
             geolocationError:
-              "Orientation appareil indisponible. Navigation topo en mode manuel.",
+              "Gyroscope refusé ou indisponible. Navigation topo en mode manuel.",
           }));
-          return;
+          return false;
         }
       }
 
-      const handleOrientation = (event: DeviceOrientationEvent) => {
-        const compassEvent = event as OrientationEventWithCompass;
+      const handleOrientation = (event: Event) => {
+        const orientationEvent = event as DeviceOrientationEvent;
+        const compassEvent = orientationEvent as OrientationEventWithCompass;
         const heading =
           typeof compassEvent.webkitCompassHeading === "number"
             ? compassEvent.webkitCompassHeading
             : typeof compassEvent.alpha === "number"
-              ? 360 - compassEvent.alpha
+              ? 360 - compassEvent.alpha + getScreenOrientationAngle()
               : null;
 
         if (heading === null) {
           return;
         }
 
-        deviceHeadingRef.current = heading;
+        deviceHeadingRef.current = normalizeBearing(heading);
 
         if (
           !topoTrackingRef.current ||
@@ -526,8 +546,8 @@ export function MapView() {
           }
 
           map.easeTo({
-            bearing: heading,
-            pitch: pitchFromDeviceTilt(event.beta, map.getPitch()),
+            bearing: deviceHeadingRef.current ?? heading,
+            pitch: pitchFromDeviceTilt(orientationEvent.beta, map.getPitch()),
             duration: 120,
             essential: true,
           });
@@ -535,14 +555,24 @@ export function MapView() {
       };
 
       window.addEventListener("deviceorientation", handleOrientation, true);
+      window.addEventListener("deviceorientationabsolute", handleOrientation, true);
       orientationHandlerRef.current = handleOrientation;
       orientationEnabledRef.current = true;
+      topoTrackingRef.current = true;
+      setTelemetry((current) => ({
+        ...current,
+        orientationStatus: "active",
+        geolocationError: null,
+      }));
+      return true;
     } catch {
       setTelemetry((current) => ({
         ...current,
+        orientationStatus: "error",
         geolocationError:
-          "Orientation appareil indisponible. Navigation topo en mode manuel.",
+          "Gyroscope indisponible. Navigation topo en mode manuel.",
       }));
+      return false;
     }
   }, []);
 
@@ -566,7 +596,6 @@ export function MapView() {
 
     let cancelled = false;
     let activeMap: MapLibreMap | null = null;
-    let gestureChangeHandler: ((event: Event) => void) | null = null;
     let mapExperienceInitialized = false;
 
     const loadMap = async () => {
@@ -607,7 +636,8 @@ export function MapView() {
         map.dragRotate.enable();
         map.doubleClickZoom.enable();
         map.scrollZoom.enable();
-        map.touchZoomRotate.enableRotation();
+        map.touchZoomRotate.enable();
+        map.touchZoomRotate.disableRotation();
         map.keyboard.enable();
 
         map.addControl(
@@ -617,7 +647,10 @@ export function MapView() {
           "bottom-right",
         );
 
-        const handleMapUpdate = () => updateTelemetryFromMap(map);
+        const handleMapUpdate = () => {
+          updateTelemetryFromMap(map);
+          updateOpenMapLighting(map);
+        };
         const handleStyleRefresh = () => {
           if (mapRef.current !== map) {
             return;
@@ -625,22 +658,12 @@ export function MapView() {
 
           try {
             applyOrraBaseStyle(map);
+            if (userLocationRef.current) {
+              setUserPositionOverlay(map, userLocationRef.current);
+            }
           } catch {
             // Remote style layers can arrive in several passes.
           }
-        };
-        gestureChangeHandler = (event: Event) => {
-          const gestureEvent = event as Event & { rotation?: number };
-
-          if (typeof gestureEvent.rotation !== "number") {
-            return;
-          }
-
-          event.preventDefault();
-          topoTrackingRef.current = false;
-          map.rotateTo(map.getBearing() + gestureEvent.rotation * 0.35, {
-            duration: 0,
-          });
         };
         const enableInitialOverlays = () => {
           if (mapRef.current !== map) {
@@ -653,7 +676,6 @@ export function MapView() {
 
             if (initialTelemetry.terrainEnabled) {
               addOpenTopographyOverlay(map);
-              void startDeviceOrientation();
             }
 
             setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
@@ -743,10 +765,6 @@ export function MapView() {
         });
 
         map.on("move", handleMapUpdate);
-        map.getCanvasContainer().addEventListener(
-          "gesturechange",
-          gestureChangeHandler,
-        );
         map.on("dragstart", () => {
           topoTrackingRef.current = false;
         });
@@ -812,12 +830,12 @@ export function MapView() {
           orientationHandlerRef.current,
           true,
         );
+        window.removeEventListener(
+          "deviceorientationabsolute",
+          orientationHandlerRef.current,
+          true,
+        );
         orientationHandlerRef.current = null;
-      }
-      if (activeMap && gestureChangeHandler) {
-        activeMap
-          .getCanvasContainer()
-          .removeEventListener("gesturechange", gestureChangeHandler);
       }
       if (activeMap) {
         clearDestinationPositionOverlay(activeMap);
@@ -832,7 +850,6 @@ export function MapView() {
   }, [
     refreshElevation,
     refreshTopographyGrid,
-    startDeviceOrientation,
     updateTelemetryFromMap,
   ]);
 
@@ -1211,6 +1228,23 @@ function browserSupportsWebGL(): boolean {
 
 function normalizeBearing(value: number): number {
   return ((value % 360) + 360) % 360;
+}
+
+function getScreenOrientationAngle(): number {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  const orientation = window.screen?.orientation;
+
+  if (typeof orientation?.angle === "number") {
+    return orientation.angle;
+  }
+
+  const legacyOrientation = (window as unknown as { orientation?: number })
+    .orientation;
+
+  return typeof legacyOrientation === "number" ? legacyOrientation : 0;
 }
 
 function topoCameraOffset(): [number, number] {

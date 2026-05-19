@@ -18,6 +18,7 @@ export const ORRA_TOPO_GRID_FAR_LAYER_ID = "orra-topography-grid-far";
 export const ORRA_USER_POSITION_SOURCE_ID = "orra-user-position";
 export const ORRA_USER_POSITION_HALO_LAYER_ID = "orra-user-position-halo";
 export const ORRA_USER_POSITION_DOT_LAYER_ID = "orra-user-position-dot";
+export const ORRA_USER_POSITION_DISC_LAYER_ID = "orra-user-position-disc";
 export const ORRA_DESTINATION_SOURCE_ID = "orra-destination-position";
 export const ORRA_DESTINATION_DOT_LAYER_ID = "orra-destination-position-dot";
 export const ORRA_ROUTE_SOURCE_ID = "orra-route";
@@ -63,6 +64,7 @@ export function setOpenStreetVisibility(map: Map, visible: boolean): void {
 
 export function applyOrraBaseStyle(map: Map): void {
   ensureOpenTerrainOverlay(map);
+  updateOpenMapLighting(map);
 
   for (const layer of map.getStyle().layers ?? []) {
     if (isOrraLayer(layer.id)) {
@@ -109,6 +111,38 @@ export function applyOrraBaseStyle(map: Map): void {
       setPaintProperty(map, layer.id, "fill-color", "#050607");
       setPaintProperty(map, layer.id, "fill-opacity", 0.88);
     }
+
+    if (layer.type === "fill" && layer.id.toLowerCase().includes("building")) {
+      setPaintProperty(map, layer.id, "fill-color", "#111214");
+      setPaintProperty(map, layer.id, "fill-outline-color", "#25272a");
+      setPaintProperty(map, layer.id, "fill-opacity", 0.7);
+    }
+  }
+}
+
+export function updateOpenMapLighting(map: Map): void {
+  const lightApi = map as Map & {
+    setLight?: (light: {
+      anchor: "map" | "viewport";
+      color: string;
+      intensity: number;
+      position: [number, number, number];
+    }) => void;
+  };
+
+  if (!lightApi.setLight) {
+    return;
+  }
+
+  try {
+    lightApi.setLight({
+      anchor: "viewport",
+      color: "#d7d4ce",
+      intensity: 0.72,
+      position: [1.35, 220 - map.getBearing(), 52],
+    });
+  } catch {
+    // Older MapLibre builds can ignore dynamic light updates.
   }
 }
 
@@ -173,11 +207,11 @@ export function addOpenBuildings(map: Map): void {
         ["linear"],
         ["coalesce", ["get", "render_height"], ["get", "height"], 0],
         0,
-        "#151617",
+        "#0f1011",
         60,
-        "#666768",
+        "#34373a",
         160,
-        "#d7cec2",
+        "#777a7c",
       ],
       "fill-extrusion-height": [
         "interpolate",
@@ -198,7 +232,7 @@ export function addOpenBuildings(map: Map): void {
         ["get", "min_height"],
         0,
       ],
-      "fill-extrusion-opacity": 0.86,
+      "fill-extrusion-opacity": 0.92,
       "fill-extrusion-vertical-gradient": true,
     },
   };
@@ -341,7 +375,7 @@ type TopographyGridGeoJson = {
   features: Array<{
     type: "Feature";
     properties: {
-      proximity: "near" | "far";
+      tone: number;
     };
     geometry: {
       type: "LineString";
@@ -417,15 +451,34 @@ export function updateTopographyGrid(
         id: ORRA_TOPO_GRID_FAR_LAYER_ID,
         type: "line",
         source: ORRA_TOPO_GRID_SOURCE_ID,
-        filter: ["==", ["get", "proximity"], "far"],
         layout: {
           "line-cap": "round",
           "line-join": "round",
         },
         paint: {
-          "line-color": "#e26f22",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.24, 14, 0.62, 18, 0.9],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.65, 14, 1.15, 18, 2.05],
+          "line-color": [
+            "interpolate",
+            ["linear"],
+            ["get", "tone"],
+            0,
+            "#fffaf0",
+            0.22,
+            "#f3d5b8",
+            0.58,
+            "#e98f4a",
+            1,
+            "#e26f22",
+          ],
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.28, 14, 0.68, 18, 0.94],
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["get", "tone"],
+            0,
+            1.82,
+            1,
+            1.05,
+          ],
           "line-blur": 0.04,
         },
       },
@@ -439,16 +492,33 @@ export function updateTopographyGrid(
         id: ORRA_TOPO_GRID_NEAR_LAYER_ID,
         type: "line",
         source: ORRA_TOPO_GRID_SOURCE_ID,
-        filter: ["==", ["get", "proximity"], "near"],
         layout: {
           "line-cap": "round",
           "line-join": "round",
         },
         paint: {
           "line-color": "#fffaf0",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.42, 18, 0.96],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.1, 18, 3],
-          "line-blur": 0.16,
+          "line-opacity": [
+            "interpolate",
+            ["linear"],
+            ["get", "tone"],
+            0,
+            0.58,
+            0.34,
+            0.08,
+            0.72,
+            0,
+          ],
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["get", "tone"],
+            0,
+            3.2,
+            0.72,
+            1.4,
+          ],
+          "line-blur": 0.22,
         },
       },
       beforeLayerId,
@@ -465,11 +535,12 @@ export function setUserPositionOverlay(
     color: "#fffaf0",
     haloColor: "#e26f22",
     layerId: ORRA_USER_POSITION_DOT_LAYER_ID,
+    discLayerId: ORRA_USER_POSITION_DISC_LAYER_ID,
     haloLayerId: ORRA_USER_POSITION_HALO_LAYER_ID,
     map,
-    radiusMeters: 4.2,
+    radiusMeters: 8.2,
     sourceId: ORRA_USER_POSITION_SOURCE_ID,
-    extrusionHeight: 2.8,
+    extrusionHeight: 4.6,
     location,
     pulse,
   });
@@ -592,15 +663,19 @@ function createTopographyGrid(
   const baseSpacingMeters = gridSpacingMeters(map.getZoom());
   const spacingMeters = constrainedGridSpacing(
     baseSpacingMeters,
-    Math.max(north - south, metersToLatitude(baseSpacingMeters * 8)),
-    Math.max(longitudeRange, metersToLongitude(baseSpacingMeters * 8, center.lat)),
+    Math.max((north - south) * 3, metersToLatitude(baseSpacingMeters * 8)),
+    Math.max(
+      longitudeRange * 3,
+      metersToLongitude(baseSpacingMeters * 8, center.lat),
+    ),
     center.lat,
   );
   const latitudeStep = metersToLatitude(spacingMeters);
   const longitudeStep = metersToLongitude(spacingMeters, center.lat);
-  const userRadiusMeters = Math.max(spacingMeters * 2.25, 160);
-  const latitudePadding = Math.max((north - south) * 0.32, latitudeStep * 5);
-  const longitudePadding = Math.max(longitudeRange * 0.32, longitudeStep * 5);
+  const whiteRadiusMeters = Math.max(spacingMeters * 0.42, 72);
+  const gradientRadiusMeters = Math.max(spacingMeters * 2.8, 360);
+  const latitudePadding = Math.max(north - south, latitudeStep * 8);
+  const longitudePadding = Math.max(longitudeRange, longitudeStep * 8);
   let minLatitude = clampLatitude(south - latitudePadding);
   let maxLatitude = clampLatitude(north + latitudePadding);
   let minLongitude = west - longitudePadding;
@@ -654,7 +729,14 @@ function createTopographyGrid(
       ]);
 
       features.push(
-        createGridSegment(from, to, midpoint, userLocation, userRadiusMeters),
+        createGridSegment(
+          from,
+          to,
+          midpoint,
+          userLocation,
+          whiteRadiusMeters,
+          gradientRadiusMeters,
+        ),
       );
     }
   }
@@ -680,7 +762,14 @@ function createTopographyGrid(
       ]);
 
       features.push(
-        createGridSegment(from, to, midpoint, userLocation, userRadiusMeters),
+        createGridSegment(
+          from,
+          to,
+          midpoint,
+          userLocation,
+          whiteRadiusMeters,
+          gradientRadiusMeters,
+        ),
       );
     }
   }
@@ -764,18 +853,23 @@ function createGridSegment(
   to: LngLatTuple,
   midpoint: LngLatTuple,
   userLocation: { latitude: number; longitude: number } | null,
-  userRadiusMeters: number,
+  whiteRadiusMeters: number,
+  gradientRadiusMeters: number,
 ): TopographyGridGeoJson["features"][number] {
-  const proximity =
-    userLocation &&
-    distanceMeters(midpoint, [userLocation.longitude, userLocation.latitude]) <=
-      userRadiusMeters
-      ? "near"
-      : "far";
+  const tone = userLocation
+    ? smoothstep(
+        whiteRadiusMeters,
+        gradientRadiusMeters,
+        distanceMeters(midpoint, [
+          userLocation.longitude,
+          userLocation.latitude,
+        ]),
+      )
+    : 1;
 
   return {
     type: "Feature",
-    properties: { proximity },
+    properties: { tone },
     geometry: {
       type: "LineString",
       coordinates: interpolateLine(from, to),
@@ -808,6 +902,7 @@ function metersToLongitude(meters: number, latitude: number): number {
 
 function setPositionOverlay({
   color,
+  discLayerId,
   extrusionHeight,
   haloColor,
   haloLayerId,
@@ -819,6 +914,7 @@ function setPositionOverlay({
   sourceId,
 }: {
   color: string;
+  discLayerId?: string;
   extrusionHeight: number;
   haloColor: string;
   haloLayerId?: string;
@@ -859,16 +955,38 @@ function setPositionOverlay({
       },
       paint: {
         "circle-color": haloColor,
-        "circle-opacity": ["-", 0.3, ["*", ["get", "pulse"], 0.22]],
+        "circle-opacity": ["-", 0.46, ["*", ["get", "pulse"], 0.4]],
         "circle-pitch-alignment": "map",
         "circle-radius": [
           "+",
-          ["interpolate", ["linear"], ["zoom"], 13, 10, 18, 34],
-          ["*", ["get", "pulse"], 22],
+          ["interpolate", ["linear"], ["zoom"], 12, 16, 15, 28, 18, 56],
+          ["*", ["get", "pulse"], 42],
         ],
         "circle-stroke-color": haloColor,
-        "circle-stroke-opacity": ["-", 0.42, ["*", ["get", "pulse"], 0.28]],
-        "circle-stroke-width": 1.1,
+        "circle-stroke-opacity": ["-", 0.66, ["*", ["get", "pulse"], 0.56]],
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 1.4, 18, 2.6],
+      },
+    });
+  }
+
+  if (discLayerId && !map.getLayer(discLayerId)) {
+    shouldLiftLayers = true;
+    map.addLayer({
+      id: discLayerId,
+      type: "circle",
+      source: sourceId,
+      filter: ["==", ["get", "kind"], "halo"],
+      layout: {
+        visibility: "visible",
+      },
+      paint: {
+        "circle-color": color,
+        "circle-opacity": 0.98,
+        "circle-pitch-alignment": "viewport",
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 4.5, 16, 7.5, 18, 10],
+        "circle-stroke-color": haloColor,
+        "circle-stroke-opacity": 0.86,
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 12, 1.1, 18, 2.2],
       },
     });
   }
@@ -901,6 +1019,7 @@ function setPositionOverlay({
   if (shouldLiftLayers) {
     moveLayerToTop(map, haloLayerId);
     moveLayerToTop(map, layerId);
+    moveLayerToTop(map, discLayerId);
   }
 }
 
@@ -988,6 +1107,19 @@ function clampLatitude(latitude: number): number {
 
 function snapDown(value: number, step: number): number {
   return Math.floor(value / step) * step;
+}
+
+function smoothstep(edgeStart: number, edgeEnd: number, value: number): number {
+  if (edgeEnd <= edgeStart) {
+    return value <= edgeStart ? 0 : 1;
+  }
+
+  const ratio = Math.min(
+    Math.max((value - edgeStart) / (edgeEnd - edgeStart), 0),
+    1,
+  );
+
+  return ratio * ratio * (3 - 2 * ratio);
 }
 
 function distanceMeters(from: LngLatTuple, to: LngLatTuple): number {

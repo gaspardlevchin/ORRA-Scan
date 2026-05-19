@@ -7,6 +7,14 @@ export type GeolocationStatus =
   | "unsupported"
   | "error";
 
+export type OrientationStatus =
+  | "idle"
+  | "requesting"
+  | "active"
+  | "manual"
+  | "unsupported"
+  | "error";
+
 export type GeoPoint = {
   latitude: number;
   longitude: number;
@@ -34,6 +42,7 @@ export type MapTelemetry = {
   buildingsEnabled: boolean;
   roadsEnabled: boolean;
   geolocationStatus: GeolocationStatus;
+  orientationStatus: OrientationStatus;
   geolocationError: string | null;
 };
 

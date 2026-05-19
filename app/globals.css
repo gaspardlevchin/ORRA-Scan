@@ -270,10 +270,11 @@ input {
   top: 18px;
   right: 18px;
   z-index: 6;
-  width: 76px;
-  height: 76px;
+  width: 82px;
+  height: 82px;
   border: 0;
-  border-radius: 26px;
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   color: var(--text);
   background: var(--panel);
   cursor: pointer;
@@ -283,11 +284,10 @@ input {
 .compass-rose::before {
   content: "";
   position: absolute;
-  inset: 17px;
-  border-radius: 50%;
+  inset: 18px;
   background:
-    linear-gradient(rgba(244, 240, 232, 0.22), rgba(244, 240, 232, 0.22)) 50% 0 / 1px 100% no-repeat,
-    linear-gradient(90deg, rgba(244, 240, 232, 0.16), rgba(244, 240, 232, 0.16)) 0 50% / 100% 1px no-repeat;
+    linear-gradient(rgba(244, 240, 232, 0.18), rgba(244, 240, 232, 0.18)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(90deg, rgba(244, 240, 232, 0.14), rgba(244, 240, 232, 0.14)) 0 50% / 100% 1px no-repeat;
   pointer-events: none;
 }
 
@@ -306,29 +306,33 @@ input {
 }
 
 .compass-rose__corner--n {
-  top: 10px;
-  left: 11px;
+  top: 8px;
+  left: 50%;
   color: var(--text);
+  transform: translateX(-50%);
 }
 
 .compass-rose__corner--e {
-  top: 10px;
-  right: 11px;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
 }
 
 .compass-rose__corner--s {
-  right: 11px;
-  bottom: 10px;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .compass-rose__corner--w {
-  left: 11px;
-  bottom: 10px;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
 }
 
 .compass-rose__needle {
   position: absolute;
-  inset: 21px;
+  inset: 22px;
   pointer-events: none;
   transition: transform 160ms ease-out;
 }
@@ -591,9 +595,9 @@ input {
   .compass-rose {
     top: 86px;
     right: 12px;
-    width: 64px;
-    height: 64px;
-    border-radius: 22px;
+    width: 68px;
+    height: 68px;
+    border-radius: 0;
   }
 
   .compass-rose__needle {
