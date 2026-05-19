@@ -91,6 +91,7 @@ export function MapView() {
   const routeAbortRef = useRef<AbortController | null>(null);
   const centerElevationTimerRef = useRef<number | null>(null);
   const initialOverlayTimerRef = useRef<number | null>(null);
+  const deferredCenterTimersRef = useRef<number[]>([]);
   const routeCoordinatesRef = useRef<LngLatTuple[]>([]);
   const currentViewModeRef = useRef<ViewMode>("topo");
   const topoTrackingRef = useRef(true);
@@ -605,16 +606,36 @@ export function MapView() {
           setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
           setOpenStreetVisibility(map, initialTelemetry.roadsEnabled);
         };
+        const centerLoadedUserLocation = () => {
+          const location = userLocationRef.current;
+
+          if (!location || centeredOnUserRef.current || mapRef.current !== map) {
+            return;
+          }
+
+          setUserPositionOverlay(map, location);
+          refreshTopographyGrid(map);
+          centeredOnUserRef.current = centerMapOn(location);
+        };
+        const scheduleLoadedUserCenter = (delay: number) => {
+          const timerId = window.setTimeout(() => {
+            centerLoadedUserLocation();
+          }, delay);
+
+          deferredCenterTimersRef.current.push(timerId);
+        };
 
         map.on("load", () => {
           mapReadyRef.current = true;
           setMapReady(true);
           updateTelemetryFromMap(map);
           void refreshElevation(PARIS_CENTER, "center");
+          scheduleLoadedUserCenter(120);
 
           initialOverlayTimerRef.current = window.setTimeout(() => {
             initialOverlayTimerRef.current = null;
             enableInitialOverlays();
+            scheduleLoadedUserCenter(160);
           }, 500);
         });
 
@@ -680,6 +701,10 @@ export function MapView() {
         window.clearTimeout(initialOverlayTimerRef.current);
         initialOverlayTimerRef.current = null;
       }
+      for (const timerId of deferredCenterTimersRef.current) {
+        window.clearTimeout(timerId);
+      }
+      deferredCenterTimersRef.current = [];
       centerElevationAbortRef.current?.abort();
       userElevationAbortRef.current?.abort();
       searchAbortRef.current?.abort();
