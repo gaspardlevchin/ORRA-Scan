@@ -134,21 +134,29 @@ export function MapView() {
   const setUserMarker = useCallback((location: GeoPoint) => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map) {
       return;
     }
 
-    setUserPositionOverlay(map, location);
+    try {
+      setUserPositionOverlay(map, location);
+    } catch {
+      // The style can still be settling while remote tiles load.
+    }
   }, []);
 
   const setDestinationMarker = useCallback((result: SearchResult) => {
     const map = mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) {
+    if (!map) {
       return;
     }
 
-    setDestinationPositionOverlay(map, result);
+    try {
+      setDestinationPositionOverlay(map, result);
+    } catch {
+      // Route selection will retry once the map finishes settling.
+    }
   }, []);
 
   const updateRouteOverlay = useCallback(
@@ -168,11 +176,11 @@ export function MapView() {
   );
 
   const refreshTopographyGrid = useCallback((map: MapLibreMap) => {
-    if (!map.isStyleLoaded()) {
-      return;
+    try {
+      updateTopographyGrid(map, userLocationRef.current);
+    } catch {
+      // MapLibre may still be attaching the style; the next move/style event retries.
     }
-
-    updateTopographyGrid(map, userLocationRef.current);
   }, []);
 
   const startPositionPulse = useCallback(() => {
@@ -184,13 +192,13 @@ export function MapView() {
       const map = mapRef.current;
       const location = userLocationRef.current;
 
-      if (
-        map?.isStyleLoaded() &&
-        location &&
-        timestamp - positionPulseLastFrameRef.current > 80
-      ) {
+      if (map && location && timestamp - positionPulseLastFrameRef.current > 80) {
         const pulse = (Math.sin(timestamp / 720) + 1) / 2;
-        setUserPositionOverlay(map, location, pulse);
+        try {
+          setUserPositionOverlay(map, location, pulse);
+        } catch {
+          // Wait for the next animation frame while the style is attaching.
+        }
         positionPulseLastFrameRef.current = timestamp;
       }
 
@@ -528,6 +536,7 @@ export function MapView() {
     let cancelled = false;
     let activeMap: MapLibreMap | null = null;
     let gestureChangeHandler: ((event: Event) => void) | null = null;
+    let mapExperienceInitialized = false;
 
     const loadMap = async () => {
       setMapError(null);
@@ -624,8 +633,12 @@ export function MapView() {
 
           deferredCenterTimersRef.current.push(timerId);
         };
+        const initializeMapExperience = () => {
+          if (mapExperienceInitialized || mapRef.current !== map) {
+            return;
+          }
 
-        map.on("load", () => {
+          mapExperienceInitialized = true;
           mapReadyRef.current = true;
           setMapReady(true);
           updateTelemetryFromMap(map);
@@ -636,8 +649,11 @@ export function MapView() {
             initialOverlayTimerRef.current = null;
             enableInitialOverlays();
             scheduleLoadedUserCenter(160);
-          }, 500);
-        });
+          }, 420);
+        };
+
+        map.on("styledata", initializeMapExperience);
+        map.on("load", initializeMapExperience);
 
         map.on("error", (event) => {
           const mapErrorEvent = event as { error?: { message?: string } };
