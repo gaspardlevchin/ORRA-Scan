@@ -3,12 +3,18 @@ import type {
   Map,
   StyleSpecification,
 } from "maplibre-gl";
+import type { LngLatTuple } from "@/types/map";
+
+type StyleSourceSpecification = NonNullable<StyleSpecification["sources"]>[string];
 
 export const OPENMAPTILES_SOURCE_ID = "openmaptiles";
 export const ORRA_TERRAIN_SOURCE_ID = "orra-terrain-dem";
 export const ORRA_TERRAIN_LAYER_ID = "orra-terrain-shade";
 export const ORRA_BUILDING_FOOTPRINT_LAYER_ID = "orra-building-footprint";
 export const ORRA_BUILDINGS_LAYER_ID = "orra-open-buildings";
+export const ORRA_ROUTE_SOURCE_ID = "orra-route";
+export const ORRA_ROUTE_TRAVELED_LAYER_ID = "orra-route-traveled";
+export const ORRA_ROUTE_AHEAD_LAYER_ID = "orra-route-ahead";
 
 const BUILDING_SOURCE_LAYER = "building";
 const BUILDING_SOURCE_LAYER_NAMES = ["building", "buildings"];
@@ -410,4 +416,136 @@ function findBuildingSource(
 function firstSymbolLayerId(map: Map): string | undefined {
   return (map.getStyle().layers ?? []).find((layer) => layer.type === "symbol")
     ?.id;
+}
+
+type RouteGeoJson = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: {
+      segment: "traveled" | "ahead";
+    };
+    geometry: {
+      type: "LineString";
+      coordinates: LngLatTuple[];
+    };
+  }>;
+};
+
+export function setRouteOverlay(
+  map: Map,
+  route: { traveled: LngLatTuple[]; ahead: LngLatTuple[] },
+): void {
+  const routeData = createRouteFeatureCollection(route);
+  const existingSource = map.getSource(ORRA_ROUTE_SOURCE_ID);
+
+  if (isGeoJsonSource(existingSource)) {
+    existingSource.setData(routeData);
+  } else {
+    map.addSource(ORRA_ROUTE_SOURCE_ID, {
+      type: "geojson",
+      data: routeData,
+    } satisfies StyleSourceSpecification);
+  }
+
+  if (!map.getLayer(ORRA_ROUTE_TRAVELED_LAYER_ID)) {
+    map.addLayer({
+      id: ORRA_ROUTE_TRAVELED_LAYER_ID,
+      type: "line",
+      source: ORRA_ROUTE_SOURCE_ID,
+      filter: ["==", ["get", "segment"], "traveled"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": "#fffaf0",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 17, 12],
+        "line-opacity": 0.96,
+        "line-blur": 0.35,
+      },
+    });
+  }
+
+  if (!map.getLayer(ORRA_ROUTE_AHEAD_LAYER_ID)) {
+    map.addLayer({
+      id: ORRA_ROUTE_AHEAD_LAYER_ID,
+      type: "line",
+      source: ORRA_ROUTE_SOURCE_ID,
+      filter: ["==", ["get", "segment"], "ahead"],
+      layout: {
+        "line-cap": "round",
+        "line-join": "round",
+      },
+      paint: {
+        "line-color": "#ffffff",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 17, 12],
+        "line-opacity": 0.9,
+        "line-dasharray": [0.4, 1.15],
+        "line-blur": 0.2,
+      },
+    });
+  }
+}
+
+export function clearRouteOverlay(map: Map): void {
+  for (const layerId of [
+    ORRA_ROUTE_TRAVELED_LAYER_ID,
+    ORRA_ROUTE_AHEAD_LAYER_ID,
+  ]) {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  }
+
+  if (map.getSource(ORRA_ROUTE_SOURCE_ID)) {
+    map.removeSource(ORRA_ROUTE_SOURCE_ID);
+  }
+}
+
+function createRouteFeatureCollection(route: {
+  traveled: LngLatTuple[];
+  ahead: LngLatTuple[];
+}): RouteGeoJson {
+  const features: RouteGeoJson["features"] = [];
+
+  if (route.traveled.length >= 2) {
+    features.push(createRouteFeature("traveled", route.traveled));
+  }
+
+  if (route.ahead.length >= 2) {
+    features.push(createRouteFeature("ahead", route.ahead));
+  }
+
+  return {
+    type: "FeatureCollection",
+    features,
+  };
+}
+
+function createRouteFeature(
+  segment: "traveled" | "ahead",
+  coordinates: LngLatTuple[],
+): RouteGeoJson["features"][number] {
+  return {
+    type: "Feature",
+    properties: {
+      segment,
+    },
+    geometry: {
+      type: "LineString",
+      coordinates,
+    },
+  };
+}
+
+function isGeoJsonSource(
+  source: unknown,
+): source is { setData: (data: RouteGeoJson) => void } {
+  return (
+    typeof source === "object" &&
+    source !== null &&
+    "setData" in source &&
+    typeof source.setData === "function"
+  );
 }

@@ -24,15 +24,16 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+    var(--font-montserrat), Montserrat, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {
   overflow: hidden;
 }
 
-button {
+button,
+input {
   font: inherit;
 }
 
@@ -111,52 +112,47 @@ button {
 
 .topography-grid {
   position: absolute;
-  left: 8vw;
-  right: 8vw;
-  bottom: 10vh;
-  height: 42vh;
-  opacity: 0.5;
-  transform: perspective(760px) rotateX(64deg);
+  left: -9vw;
+  right: -9vw;
+  bottom: -9vh;
+  height: 74vh;
+  opacity: 0.78;
+  transform: perspective(860px) rotateX(67deg);
   transform-origin: 50% 100%;
+  will-change: transform;
 }
 
-.contour-line {
+.topography-grid::after {
+  content: "";
   position: absolute;
-  left: 50%;
-  width: min(88vw, 1120px);
-  height: 70px;
-  border-top: 1px solid rgba(244, 240, 232, 0.36);
-  border-radius: 50%;
-  transform: translateX(-50%);
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 100%, rgba(226, 111, 34, 0.18), transparent 62%);
+  filter: blur(18px);
+  opacity: 0.64;
 }
 
-.contour-line--a {
+.topo-grid-line {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.topo-grid-line--row {
+  left: 0;
+  right: 0;
+  top: var(--grid-position);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--grid-color), transparent);
+  box-shadow: 0 0 18px rgba(226, 111, 34, 0.16);
+}
+
+.topo-grid-line--column {
+  top: 0;
   bottom: 0;
-  width: min(92vw, 1180px);
-  border-color: rgba(244, 240, 232, 0.52);
-}
-
-.contour-line--b {
-  bottom: 11%;
-  width: min(80vw, 980px);
-}
-
-.contour-line--c {
-  bottom: 25%;
-  width: min(68vw, 780px);
-  border-color: rgba(238, 143, 88, 0.42);
-}
-
-.contour-line--d {
-  bottom: 42%;
-  width: min(52vw, 600px);
-  border-color: rgba(240, 109, 50, 0.44);
-}
-
-.contour-line--e {
-  bottom: 62%;
-  width: min(34vw, 420px);
-  border-color: rgba(240, 109, 50, 0.32);
+  left: var(--grid-position);
+  width: 2px;
+  background: linear-gradient(to top, rgba(246, 242, 235, 0.72), rgba(226, 111, 34, 0.58), transparent);
+  box-shadow: 0 0 14px rgba(246, 242, 235, 0.12);
 }
 
 .depth-lines {
@@ -234,57 +230,10 @@ button {
   opacity: 0.28;
 }
 
-.scanner-frame {
-  position: absolute;
-  inset: 22px;
-  z-index: 5;
-  pointer-events: none;
-  border-radius: 8px;
-}
-
-.scanner-frame__corner {
-  position: absolute;
-  width: 82px;
-  height: 82px;
-  border-color: rgba(244, 240, 232, 0.58);
-}
-
-.scanner-frame__corner--tl {
-  left: 0;
-  top: 0;
-  border-left: 1px solid;
-  border-top: 1px solid;
-}
-
-.scanner-frame__corner--tr {
-  right: 0;
-  top: 0;
-  border-right: 1px solid;
-  border-top: 1px solid;
-}
-
-.scanner-frame__corner--br {
-  right: 0;
-  bottom: 0;
-  border-right: 1px solid;
-  border-bottom: 1px solid;
-}
-
-.scanner-frame__corner--bl {
-  left: 0;
-  bottom: 0;
-  border-left: 1px solid;
-  border-bottom: 1px solid;
-}
-
-.scanner-frame__rail {
-  display: none;
-}
-
 .scan-topbar {
   position: absolute;
   top: 18px;
-  left: 18px;
+  right: 18px;
   z-index: 6;
   display: inline-flex;
   align-items: center;
@@ -309,7 +258,6 @@ button {
   align-items: center;
   gap: 7px;
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -330,6 +278,163 @@ button {
 .scan-topbar__status[data-status="granted"]::before {
   background: var(--orange);
   box-shadow: 0 0 14px var(--orange-soft);
+}
+
+.search-panel {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 7;
+  width: min(430px, calc(100vw - 36px));
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(15, 15, 16, 0.84), rgba(4, 4, 5, 0.64));
+  box-shadow: var(--shadow);
+}
+
+.search-input,
+.search-button {
+  min-height: 42px;
+  border: 1px solid rgba(244, 240, 232, 0.1);
+  border-radius: 9px;
+  color: var(--text);
+  background: rgba(3, 3, 4, 0.72);
+}
+
+.search-input {
+  min-width: 0;
+  padding: 0 14px;
+  outline: none;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.search-input::placeholder {
+  color: rgba(244, 240, 232, 0.42);
+}
+
+.search-input:focus {
+  border-color: rgba(226, 111, 34, 0.64);
+}
+
+.search-button {
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.search-results,
+.route-card,
+.search-message {
+  margin-top: 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: rgba(5, 5, 6, 0.82);
+  box-shadow: var(--shadow);
+}
+
+.search-results {
+  display: grid;
+  max-height: 260px;
+  overflow: auto;
+  padding: 6px;
+}
+
+.search-result {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-result:hover {
+  background: rgba(244, 240, 232, 0.08);
+}
+
+.search-result span {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.search-message {
+  padding: 10px 12px;
+  color: var(--danger);
+  font-size: 0.76rem;
+}
+
+.route-card {
+  padding: 12px;
+}
+
+.route-card__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 10px;
+  align-items: start;
+}
+
+.route-card__main span {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-card__main button {
+  height: 30px;
+  border: 1px solid rgba(244, 240, 232, 0.12);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(2, 2, 2, 0.62);
+  cursor: pointer;
+}
+
+.route-card__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.route-card__metrics span {
+  padding: 6px 8px;
+  border: 1px solid rgba(244, 240, 232, 0.1);
+  border-radius: 999px;
+  color: rgba(244, 240, 232, 0.86);
+  background: rgba(244, 240, 232, 0.045);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.route-card p {
+  margin: 10px 0 0;
+  color: var(--orange);
+  font-size: 0.68rem;
+  line-height: 1.4;
 }
 
 .panel-stack {
@@ -357,7 +462,6 @@ button {
 .panel-kicker {
   margin: 0 0 11px;
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -377,7 +481,6 @@ button {
 
 .data-label {
   color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.62rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -386,7 +489,6 @@ button {
 .data-value {
   min-width: 0;
   color: var(--text);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.76rem;
   text-align: right;
   overflow-wrap: anywhere;
@@ -420,7 +522,6 @@ button {
   color: var(--muted);
   background: rgba(5, 5, 6, 0.72);
   cursor: pointer;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.68rem;
   letter-spacing: 0.1em;
   transition:
@@ -491,6 +592,46 @@ button {
   animation: marker-pulse 2.8s ease-out infinite;
 }
 
+.destination-marker {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fffaf0;
+  border-radius: 50%;
+  background: rgba(226, 111, 34, 0.72);
+  box-shadow:
+    0 0 0 6px rgba(226, 111, 34, 0.14),
+    0 0 24px rgba(255, 250, 240, 0.34);
+}
+
+.orra-logo-fixed {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 6;
+  width: 54px;
+  height: 54px;
+  opacity: 0.82;
+  filter: invert(1);
+  pointer-events: none;
+}
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #e26f22 0%, #e26f22 44%, #000000 100%);
+  animation: splash-fade 2.1s ease forwards;
+  pointer-events: none;
+}
+
+.splash-screen img {
+  width: min(220px, 42vw);
+  height: min(220px, 42vw);
+  animation: splash-mark 2.1s ease forwards;
+}
+
 @keyframes marker-pulse {
   0% {
     opacity: 0.82;
@@ -499,6 +640,34 @@ button {
   100% {
     opacity: 0;
     transform: scale(1.5);
+  }
+}
+
+@keyframes splash-fade {
+  0%,
+  62% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes splash-mark {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  24%,
+  68% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.03);
   }
 }
 
@@ -513,7 +682,17 @@ button {
 
   .scan-topbar {
     top: 12px;
+    right: 12px;
+  }
+
+  .search-panel {
+    top: 12px;
     left: 12px;
+    width: calc(100vw - 24px);
+  }
+
+  .search-form {
+    grid-template-columns: minmax(0, 1fr) 52px;
   }
 
   .panel-stack {
@@ -526,13 +705,11 @@ button {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
-  .scanner-frame {
-    inset: 10px;
-  }
-
-  .scanner-frame__corner {
-    width: 48px;
-    height: 48px;
+  .topography-grid {
+    left: -24vw;
+    right: -24vw;
+    bottom: -4vh;
+    height: 58vh;
   }
 
   .depth-line {
@@ -542,6 +719,14 @@ button {
 
   .descent-arrows {
     bottom: 24vh;
+  }
+
+  .orra-logo-fixed {
+    bottom: 128px;
+    top: auto;
+    left: 16px;
+    width: 40px;
+    height: 40px;
   }
 }
 

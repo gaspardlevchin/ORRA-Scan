@@ -1,7 +1,7 @@
 import type { GeolocationStatus } from "@/types/map";
 
 type ControlPanelProps = {
-  terrainEnabled: boolean;
+  topoModeActive: boolean;
   buildingsEnabled: boolean;
   isFullscreen: boolean;
   mapReady: boolean;
@@ -13,7 +13,7 @@ type ControlPanelProps = {
 };
 
 export function ControlPanel({
-  terrainEnabled,
+  topoModeActive,
   buildingsEnabled,
   isFullscreen,
   mapReady,
@@ -40,7 +40,7 @@ export function ControlPanel({
       <button
         className="control-button"
         type="button"
-        data-active={terrainEnabled}
+        data-active={topoModeActive}
         onClick={onToggleTerrain}
         disabled={!mapReady}
         aria-label="Activer ou désactiver le relief"

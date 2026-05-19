@@ -34,3 +34,28 @@ export type MapTelemetry = {
   geolocationStatus: GeolocationStatus;
   geolocationError: string | null;
 };
+
+export type SearchResult = {
+  id: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+  source: "coordinates" | "nominatim";
+  category?: string;
+};
+
+export type LngLatTuple = [number, number];
+
+export type RouteMetrics = {
+  routeDistanceMeters: number | null;
+  linearDistanceMeters: number;
+  durationSeconds: number | null;
+};
+
+export type RouteState = {
+  destination: SearchResult;
+  coordinates: LngLatTuple[];
+  metrics: RouteMetrics;
+  status: "loading" | "ready" | "error";
+  message: string | null;
+};
