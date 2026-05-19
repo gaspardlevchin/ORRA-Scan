@@ -15,6 +15,11 @@ export const ORRA_BUILDINGS_LAYER_ID = "orra-open-buildings";
 export const ORRA_TOPO_GRID_SOURCE_ID = "orra-topography-grid";
 export const ORRA_TOPO_GRID_NEAR_LAYER_ID = "orra-topography-grid-near";
 export const ORRA_TOPO_GRID_FAR_LAYER_ID = "orra-topography-grid-far";
+export const ORRA_USER_POSITION_SOURCE_ID = "orra-user-position";
+export const ORRA_USER_POSITION_HALO_LAYER_ID = "orra-user-position-halo";
+export const ORRA_USER_POSITION_DOT_LAYER_ID = "orra-user-position-dot";
+export const ORRA_DESTINATION_SOURCE_ID = "orra-destination-position";
+export const ORRA_DESTINATION_DOT_LAYER_ID = "orra-destination-position-dot";
 export const ORRA_ROUTE_SOURCE_ID = "orra-route";
 export const ORRA_ROUTE_TRAVELED_LAYER_ID = "orra-route-traveled";
 export const ORRA_ROUTE_AHEAD_LAYER_ID = "orra-route-ahead";
@@ -112,9 +117,9 @@ export const OPENFREE_MAP_STYLE: StyleSpecification = {
       },
       paint: {
         "hillshade-shadow-color": "#000000",
-        "hillshade-highlight-color": "#ece7dd",
-        "hillshade-accent-color": "#f06b2f",
-        "hillshade-exaggeration": 0.68,
+        "hillshade-highlight-color": "#f2eee7",
+        "hillshade-accent-color": "#8f8a84",
+        "hillshade-exaggeration": 0.86,
       },
     },
     {
@@ -451,6 +456,34 @@ type TopographyGridGeoJson = {
   }>;
 };
 
+type PositionGeoJson = {
+  type: "FeatureCollection";
+  features: Array<
+    | {
+        type: "Feature";
+        properties: {
+          kind: "halo";
+          pulse: number;
+        };
+        geometry: {
+          type: "Point";
+          coordinates: LngLatTuple;
+        };
+      }
+    | {
+        type: "Feature";
+        properties: {
+          kind: "dot";
+          pulse: number;
+        };
+        geometry: {
+          type: "Polygon";
+          coordinates: LngLatTuple[][];
+        };
+      }
+  >;
+};
+
 type RouteGeoJson = {
   type: "FeatureCollection";
   features: Array<{
@@ -467,10 +500,9 @@ type RouteGeoJson = {
 
 export function updateTopographyGrid(
   map: Map,
-  center: { latitude: number; longitude: number },
-  zoom: number,
+  userLocation: { latitude: number; longitude: number } | null,
 ): void {
-  const gridData = createTopographyGrid(center, zoom);
+  const gridData = createTopographyGrid(map, userLocation);
   const existingSource = map.getSource(ORRA_TOPO_GRID_SOURCE_ID);
   const beforeLayerId = map.getLayer(ORRA_BUILDING_FOOTPRINT_LAYER_ID)
     ? ORRA_BUILDING_FOOTPRINT_LAYER_ID
@@ -498,8 +530,8 @@ export function updateTopographyGrid(
         },
         paint: {
           "line-color": "#e26f22",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.2, 17, 0.72],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.7, 18, 2.2],
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.14, 17, 0.58],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.45, 18, 1.45],
           "line-blur": 0.14,
         },
       },
@@ -520,13 +552,59 @@ export function updateTopographyGrid(
         },
         paint: {
           "line-color": "#fffaf0",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.34, 17, 0.92],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.85, 18, 2.55],
-          "line-blur": 0.1,
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.26, 18, 0.88],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.75, 18, 2.35],
+          "line-blur": 0.24,
         },
       },
       beforeLayerId,
     );
+  }
+}
+
+export function setUserPositionOverlay(
+  map: Map,
+  location: { latitude: number; longitude: number },
+  pulse = 0,
+): void {
+  setPositionOverlay({
+    color: "#fffaf0",
+    haloColor: "#e26f22",
+    layerId: ORRA_USER_POSITION_DOT_LAYER_ID,
+    haloLayerId: ORRA_USER_POSITION_HALO_LAYER_ID,
+    map,
+    radiusMeters: 4.2,
+    sourceId: ORRA_USER_POSITION_SOURCE_ID,
+    extrusionHeight: 2.8,
+    location,
+    pulse,
+  });
+}
+
+export function setDestinationPositionOverlay(
+  map: Map,
+  location: { latitude: number; longitude: number },
+): void {
+  setPositionOverlay({
+    color: "#e26f22",
+    haloColor: "#fffaf0",
+    layerId: ORRA_DESTINATION_DOT_LAYER_ID,
+    map,
+    radiusMeters: 5.4,
+    sourceId: ORRA_DESTINATION_SOURCE_ID,
+    extrusionHeight: 3.2,
+    location,
+    pulse: 0.28,
+  });
+}
+
+export function clearDestinationPositionOverlay(map: Map): void {
+  if (map.getLayer(ORRA_DESTINATION_DOT_LAYER_ID)) {
+    map.removeLayer(ORRA_DESTINATION_DOT_LAYER_ID);
+  }
+
+  if (map.getSource(ORRA_DESTINATION_SOURCE_ID)) {
+    map.removeSource(ORRA_DESTINATION_SOURCE_ID);
   }
 }
 
@@ -607,46 +685,86 @@ function setTopographyGridVisibility(map: Map, visible: boolean): void {
 }
 
 function createTopographyGrid(
-  center: { latitude: number; longitude: number },
-  zoom: number,
+  map: Map,
+  userLocation: { latitude: number; longitude: number } | null,
 ): TopographyGridGeoJson {
-  const spacingMeters = gridSpacingMeters(zoom);
-  const halfCount = 7;
-  const lineHalfLengthMeters = spacingMeters * halfCount;
+  const bounds = map.getBounds();
+  const center = map.getCenter();
+  const west = normalizeLongitude(bounds.getWest());
+  const east = normalizeLongitude(bounds.getEast());
+  const south = clampLatitude(bounds.getSouth());
+  const north = clampLatitude(bounds.getNorth());
+  const longitudeRange = normalizeLongitudeSpan(west, east);
+  const baseSpacingMeters = gridSpacingMeters(map.getZoom());
+  const spacingMeters = constrainedGridSpacing(
+    baseSpacingMeters,
+    Math.max(north - south, metersToLatitude(baseSpacingMeters * 8)),
+    Math.max(longitudeRange, metersToLongitude(baseSpacingMeters * 8, center.lat)),
+    center.lat,
+  );
   const latitudeStep = metersToLatitude(spacingMeters);
-  const longitudeStep = metersToLongitude(spacingMeters, center.latitude);
-  const latitudeSpan = metersToLatitude(lineHalfLengthMeters);
-  const longitudeSpan = metersToLongitude(lineHalfLengthMeters, center.latitude);
+  const longitudeStep = metersToLongitude(spacingMeters, center.lat);
+  const userRadiusMeters = Math.max(spacingMeters * 2.25, 160);
+  const latitudePadding = Math.max((north - south) * 0.32, latitudeStep * 5);
+  const longitudePadding = Math.max(longitudeRange * 0.32, longitudeStep * 5);
+  const minLatitude = clampLatitude(south - latitudePadding);
+  const maxLatitude = clampLatitude(north + latitudePadding);
+  const minLongitude = west - longitudePadding;
+  const maxLongitude = west + longitudeRange + longitudePadding;
+  const startLatitude = snapDown(minLatitude, latitudeStep);
+  const startLongitude = snapDown(minLongitude, longitudeStep);
   const features: TopographyGridGeoJson["features"] = [];
 
-  for (let index = -halfCount; index <= halfCount; index += 1) {
-    const proximity = Math.abs(index) <= 1 ? "near" : "far";
-    const latitude = center.latitude + latitudeStep * index;
-    const longitude = center.longitude + longitudeStep * index;
+  for (
+    let latitude = startLatitude;
+    latitude <= maxLatitude + latitudeStep;
+    latitude += latitudeStep
+  ) {
+    for (
+      let longitude = startLongitude;
+      longitude <= maxLongitude + longitudeStep;
+      longitude += longitudeStep
+    ) {
+      const from = normalizeLngLat([longitude, latitude]);
+      const to = normalizeLngLat([
+        Math.min(longitude + longitudeStep, maxLongitude),
+        latitude,
+      ]);
+      const midpoint = normalizeLngLat([
+        (longitude + Math.min(longitude + longitudeStep, maxLongitude)) / 2,
+        latitude,
+      ]);
 
-    features.push({
-      type: "Feature",
-      properties: { proximity },
-      geometry: {
-        type: "LineString",
-        coordinates: interpolateLine(
-          [center.longitude - longitudeSpan, latitude],
-          [center.longitude + longitudeSpan, latitude],
-        ),
-      },
-    });
+      features.push(
+        createGridSegment(from, to, midpoint, userLocation, userRadiusMeters),
+      );
+    }
+  }
 
-    features.push({
-      type: "Feature",
-      properties: { proximity },
-      geometry: {
-        type: "LineString",
-        coordinates: interpolateLine(
-          [longitude, center.latitude - latitudeSpan],
-          [longitude, center.latitude + latitudeSpan],
-        ),
-      },
-    });
+  for (
+    let longitude = startLongitude;
+    longitude <= maxLongitude + longitudeStep;
+    longitude += longitudeStep
+  ) {
+    for (
+      let latitude = startLatitude;
+      latitude <= maxLatitude + latitudeStep;
+      latitude += latitudeStep
+    ) {
+      const from = normalizeLngLat([longitude, latitude]);
+      const to = normalizeLngLat([
+        longitude,
+        Math.min(latitude + latitudeStep, maxLatitude),
+      ]);
+      const midpoint = normalizeLngLat([
+        longitude,
+        (latitude + Math.min(latitude + latitudeStep, maxLatitude)) / 2,
+      ]);
+
+      features.push(
+        createGridSegment(from, to, midpoint, userLocation, userRadiusMeters),
+      );
+    }
   }
 
   return {
@@ -656,19 +774,95 @@ function createTopographyGrid(
 }
 
 function gridSpacingMeters(zoom: number): number {
-  if (zoom >= 17.5) {
-    return 24;
+  if (zoom >= 17) {
+    return 80;
   }
 
-  if (zoom >= 16) {
-    return 42;
+  if (zoom >= 15) {
+    return 160;
   }
 
-  if (zoom >= 14) {
-    return 95;
+  if (zoom >= 13) {
+    return 420;
   }
 
-  return 220;
+  if (zoom >= 11) {
+    return 1200;
+  }
+
+  if (zoom >= 9) {
+    return 4500;
+  }
+
+  if (zoom >= 7) {
+    return 16000;
+  }
+
+  return 64000;
+}
+
+function constrainedGridSpacing(
+  baseSpacingMeters: number,
+  latitudeRangeDegrees: number,
+  longitudeRangeDegrees: number,
+  latitude: number,
+): number {
+  let spacingMeters = baseSpacingMeters;
+  const maxSegments = 1800;
+
+  while (
+    estimatedGridSegments(
+      spacingMeters,
+      latitudeRangeDegrees,
+      longitudeRangeDegrees,
+      latitude,
+    ) > maxSegments
+  ) {
+    spacingMeters *= 2;
+  }
+
+  return spacingMeters;
+}
+
+function estimatedGridSegments(
+  spacingMeters: number,
+  latitudeRangeDegrees: number,
+  longitudeRangeDegrees: number,
+  latitude: number,
+): number {
+  const latitudeMeters = latitudeRangeDegrees * 111320;
+  const longitudeMeters =
+    longitudeRangeDegrees *
+    111320 *
+    Math.max(Math.cos((latitude * Math.PI) / 180), 0.18);
+  const rows = Math.ceil(latitudeMeters / spacingMeters) + 1;
+  const columns = Math.ceil(longitudeMeters / spacingMeters) + 1;
+
+  return rows * columns * 2;
+}
+
+function createGridSegment(
+  from: LngLatTuple,
+  to: LngLatTuple,
+  midpoint: LngLatTuple,
+  userLocation: { latitude: number; longitude: number } | null,
+  userRadiusMeters: number,
+): TopographyGridGeoJson["features"][number] {
+  const proximity =
+    userLocation &&
+    distanceMeters(midpoint, [userLocation.longitude, userLocation.latitude]) <=
+      userRadiusMeters
+      ? "near"
+      : "far";
+
+  return {
+    type: "Feature",
+    properties: { proximity },
+    geometry: {
+      type: "LineString",
+      coordinates: interpolateLine(from, to),
+    },
+  };
 }
 
 function interpolateLine(from: LngLatTuple, to: LngLatTuple): LngLatTuple[] {
@@ -692,6 +886,199 @@ function metersToLongitude(meters: number, latitude: number): number {
   const latitudeScale = Math.max(Math.cos((latitude * Math.PI) / 180), 0.18);
 
   return meters / (111320 * latitudeScale);
+}
+
+function setPositionOverlay({
+  color,
+  extrusionHeight,
+  haloColor,
+  haloLayerId,
+  layerId,
+  location,
+  map,
+  pulse,
+  radiusMeters,
+  sourceId,
+}: {
+  color: string;
+  extrusionHeight: number;
+  haloColor: string;
+  haloLayerId?: string;
+  layerId: string;
+  location: { latitude: number; longitude: number };
+  map: Map;
+  pulse: number;
+  radiusMeters: number;
+  sourceId: string;
+}): void {
+  const positionData = createPositionFeatureCollection(
+    location,
+    radiusMeters,
+    pulse,
+  );
+  const existingSource = map.getSource(sourceId);
+
+  if (isGeoJsonSource<PositionGeoJson>(existingSource)) {
+    existingSource.setData(positionData);
+  } else {
+    map.addSource(sourceId, {
+      type: "geojson",
+      data: positionData,
+    } satisfies StyleSourceSpecification);
+  }
+
+  let shouldLiftLayers = pulse === 0;
+
+  if (haloLayerId && !map.getLayer(haloLayerId)) {
+    shouldLiftLayers = true;
+    map.addLayer({
+      id: haloLayerId,
+      type: "circle",
+      source: sourceId,
+      filter: ["==", ["get", "kind"], "halo"],
+      layout: {
+        visibility: "visible",
+      },
+      paint: {
+        "circle-color": haloColor,
+        "circle-opacity": ["-", 0.3, ["*", ["get", "pulse"], 0.22]],
+        "circle-pitch-alignment": "map",
+        "circle-radius": [
+          "+",
+          ["interpolate", ["linear"], ["zoom"], 13, 10, 18, 34],
+          ["*", ["get", "pulse"], 22],
+        ],
+        "circle-stroke-color": haloColor,
+        "circle-stroke-opacity": ["-", 0.42, ["*", ["get", "pulse"], 0.28]],
+        "circle-stroke-width": 1.1,
+      },
+    });
+  }
+
+  if (!map.getLayer(layerId)) {
+    shouldLiftLayers = true;
+    map.addLayer({
+      id: layerId,
+      type: "fill-extrusion",
+      source: sourceId,
+      filter: ["==", ["get", "kind"], "dot"],
+      paint: {
+        "fill-extrusion-base": 0,
+        "fill-extrusion-color": color,
+        "fill-extrusion-height": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          13,
+          extrusionHeight * 0.38,
+          18,
+          extrusionHeight,
+        ],
+        "fill-extrusion-opacity": 0.96,
+        "fill-extrusion-vertical-gradient": true,
+      },
+    });
+  }
+
+  if (shouldLiftLayers) {
+    moveLayerToTop(map, haloLayerId);
+    moveLayerToTop(map, layerId);
+  }
+}
+
+function createPositionFeatureCollection(
+  location: { latitude: number; longitude: number },
+  radiusMeters: number,
+  pulse: number,
+): PositionGeoJson {
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {
+          kind: "halo",
+          pulse,
+        },
+        geometry: {
+          type: "Point",
+          coordinates: [location.longitude, location.latitude],
+        },
+      },
+      {
+        type: "Feature",
+        properties: {
+          kind: "dot",
+          pulse,
+        },
+        geometry: {
+          type: "Polygon",
+          coordinates: [createCirclePolygon(location, radiusMeters)],
+        },
+      },
+    ],
+  };
+}
+
+function createCirclePolygon(
+  center: { latitude: number; longitude: number },
+  radiusMeters: number,
+): LngLatTuple[] {
+  const points: LngLatTuple[] = [];
+  const steps = 36;
+
+  for (let index = 0; index <= steps; index += 1) {
+    const angle = (index / steps) * Math.PI * 2;
+    const latitudeOffset = metersToLatitude(Math.sin(angle) * radiusMeters);
+    const longitudeOffset = metersToLongitude(
+      Math.cos(angle) * radiusMeters,
+      center.latitude,
+    );
+
+    points.push([
+      center.longitude + longitudeOffset,
+      center.latitude + latitudeOffset,
+    ]);
+  }
+
+  return points;
+}
+
+function moveLayerToTop(map: Map, layerId: string | undefined): void {
+  if (!layerId || !map.getLayer(layerId)) {
+    return;
+  }
+
+  map.moveLayer(layerId);
+}
+
+function normalizeLngLat(coordinate: LngLatTuple): LngLatTuple {
+  return [normalizeLongitude(coordinate[0]), clampLatitude(coordinate[1])];
+}
+
+function normalizeLongitude(longitude: number): number {
+  return ((((longitude + 180) % 360) + 360) % 360) - 180;
+}
+
+function normalizeLongitudeSpan(west: number, east: number): number {
+  return east >= west ? east - west : east + 360 - west;
+}
+
+function clampLatitude(latitude: number): number {
+  return Math.max(Math.min(latitude, 84.5), -84.5);
+}
+
+function snapDown(value: number, step: number): number {
+  return Math.floor(value / step) * step;
+}
+
+function distanceMeters(from: LngLatTuple, to: LngLatTuple): number {
+  const meanLatitude = ((from[1] + to[1]) / 2) * (Math.PI / 180);
+  const latitudeMeters = (to[1] - from[1]) * 111320;
+  const longitudeMeters =
+    normalizeLongitude(to[0] - from[0]) * 111320 * Math.cos(meanLatitude);
+
+  return Math.hypot(latitudeMeters, longitudeMeters);
 }
 
 function createRouteFeatureCollection(route: {
@@ -730,7 +1117,9 @@ function createRouteFeature(
   };
 }
 
-function isGeoJsonSource<TData extends TopographyGridGeoJson | RouteGeoJson>(
+function isGeoJsonSource<
+  TData extends PositionGeoJson | RouteGeoJson | TopographyGridGeoJson,
+>(
   source: unknown,
 ): source is { setData: (data: TData) => void } {
   return (

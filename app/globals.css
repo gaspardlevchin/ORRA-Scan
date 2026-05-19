@@ -10,7 +10,10 @@
   --text: #f4f0e8;
   --muted: #87837c;
   --danger: #ff6f5f;
-  --shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
+  --panel: #070708;
+  --panel-raised: #0d0d0f;
+  --shadow: 0 20px 70px rgba(0, 0, 0, 0.42);
+  --shadow-soft: 0 16px 54px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -91,6 +94,10 @@ input {
   cursor: grabbing;
 }
 
+.maplibregl-canvas-container.maplibregl-interactive {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
 .scan-vignette {
   position: absolute;
   inset: 0;
@@ -114,19 +121,19 @@ input {
   grid-template-columns: minmax(0, 1fr) 58px;
   gap: 8px;
   padding: 8px;
-  border: 1px solid var(--line-soft);
+  border: 0;
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(15, 15, 16, 0.84), rgba(4, 4, 5, 0.64));
-  box-shadow: var(--shadow);
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .search-input,
 .search-button {
   min-height: 42px;
-  border: 1px solid rgba(244, 240, 232, 0.1);
+  border: 0;
   border-radius: 16px;
   color: var(--text);
-  background: rgba(3, 3, 4, 0.72);
+  background: var(--panel-raised);
 }
 
 .search-input {
@@ -142,7 +149,7 @@ input {
 }
 
 .search-input:focus {
-  border-color: rgba(226, 111, 34, 0.64);
+  box-shadow: inset 0 0 0 1px rgba(226, 111, 34, 0.38);
 }
 
 .search-button {
@@ -156,10 +163,10 @@ input {
 .route-card,
 .search-message {
   margin-top: 8px;
-  border: 1px solid var(--line-soft);
+  border: 0;
   border-radius: 22px;
-  background: rgba(5, 5, 6, 0.82);
-  box-shadow: var(--shadow);
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .search-results {
@@ -183,7 +190,7 @@ input {
 }
 
 .search-result:hover {
-  background: rgba(244, 240, 232, 0.08);
+  background: rgba(244, 240, 232, 0.075);
 }
 
 .search-result span {
@@ -227,10 +234,10 @@ input {
 
 .route-card__main button {
   height: 30px;
-  border: 1px solid rgba(244, 240, 232, 0.12);
+  border: 0;
   border-radius: 14px;
   color: var(--muted);
-  background: rgba(2, 2, 2, 0.62);
+  background: var(--panel-raised);
   cursor: pointer;
 }
 
@@ -243,10 +250,10 @@ input {
 
 .route-card__metrics span {
   padding: 6px 8px;
-  border: 1px solid rgba(244, 240, 232, 0.1);
+  border: 0;
   border-radius: 999px;
   color: rgba(244, 240, 232, 0.86);
-  background: rgba(244, 240, 232, 0.045);
+  background: #121214;
   font-size: 0.66rem;
   font-weight: 600;
 }
@@ -260,110 +267,83 @@ input {
 
 .compass-rose {
   position: absolute;
-  left: 18px;
-  bottom: 86px;
+  top: 18px;
+  right: 18px;
   z-index: 6;
-  display: grid;
-  grid-template-columns: 28px 76px 28px;
-  gap: 8px;
-  align-items: center;
-}
-
-.compass-rose__dial {
-  position: relative;
   width: 76px;
   height: 76px;
-  border: 1px solid rgba(244, 240, 232, 0.18);
+  border: 0;
   border-radius: 26px;
-  background: linear-gradient(160deg, rgba(15, 15, 16, 0.72), rgba(4, 4, 5, 0.54));
-  box-shadow: var(--shadow);
-  transition: transform 140ms ease-out;
+  color: var(--text);
+  background: var(--panel);
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
 }
 
-.compass-rose__dial::before,
-.compass-rose__dial::after {
+.compass-rose::before {
   content: "";
   position: absolute;
-  inset: 14px;
+  inset: 17px;
   border-radius: 50%;
+  background:
+    linear-gradient(rgba(244, 240, 232, 0.22), rgba(244, 240, 232, 0.22)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(90deg, rgba(244, 240, 232, 0.16), rgba(244, 240, 232, 0.16)) 0 50% / 100% 1px no-repeat;
   pointer-events: none;
 }
 
-.compass-rose__dial::before {
-  border: 1px solid rgba(244, 240, 232, 0.12);
+.compass-rose:hover {
+  background: #0b0b0d;
 }
 
-.compass-rose__dial::after {
-  clip-path: polygon(50% 2%, 58% 44%, 50% 36%, 42% 44%);
-  background: linear-gradient(180deg, #fffaf0, rgba(226, 111, 34, 0.8));
-  filter: drop-shadow(0 0 12px rgba(226, 111, 34, 0.42));
-}
-
-.compass-rose__dial span {
+.compass-rose__corner {
   position: absolute;
-  color: rgba(244, 240, 232, 0.74);
-  font-size: 0.58rem;
+  color: rgba(244, 240, 232, 0.72);
+  font-size: 0.56rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1;
+  pointer-events: none;
 }
 
-.compass-rose__dial span:nth-child(1) {
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
+.compass-rose__corner--n {
+  top: 10px;
+  left: 11px;
   color: var(--text);
 }
 
-.compass-rose__dial span:nth-child(2) {
-  top: 50%;
-  right: 7px;
-  transform: translateY(-50%);
+.compass-rose__corner--e {
+  top: 10px;
+  right: 11px;
 }
 
-.compass-rose__dial span:nth-child(3) {
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
+.compass-rose__corner--s {
+  right: 11px;
+  bottom: 10px;
 }
 
-.compass-rose__dial span:nth-child(4) {
-  top: 50%;
-  left: 7px;
-  transform: translateY(-50%);
+.compass-rose__corner--w {
+  left: 11px;
+  bottom: 10px;
 }
 
-.compass-rose__turn {
-  position: relative;
-  width: 28px;
-  height: 42px;
-  border: 1px solid rgba(244, 240, 232, 0.14);
-  border-radius: 14px;
-  background: rgba(5, 5, 6, 0.64);
-  cursor: pointer;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.34);
+.compass-rose__needle {
+  position: absolute;
+  inset: 21px;
+  pointer-events: none;
+  transition: transform 160ms ease-out;
 }
 
-.compass-rose__turn::before {
+.compass-rose__needle::before {
   content: "";
   position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 9px;
-  height: 9px;
-  border-top: 1px solid rgba(244, 240, 232, 0.74);
-  border-left: 1px solid rgba(244, 240, 232, 0.74);
-}
-
-.compass-rose__turn--left::before {
-  transform: translateX(2px) rotate(-45deg);
-}
-
-.compass-rose__turn--right::before {
-  transform: translateX(-2px) rotate(135deg);
-}
-
-.compass-rose__turn:hover {
-  border-color: rgba(226, 111, 34, 0.46);
+  top: 0;
+  left: 50%;
+  width: 7px;
+  height: 24px;
+  background: linear-gradient(180deg, #fffaf0, rgba(226, 111, 34, 0.82));
+  clip-path: polygon(50% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 0 10px rgba(226, 111, 34, 0.35));
+  transform: translateX(-50%);
 }
 
 .panel-stack {
@@ -378,10 +358,10 @@ input {
 
 .info-panel,
 .control-panel {
-  border: 1px solid var(--line-soft);
+  border: 0;
   border-radius: 22px;
-  background: linear-gradient(160deg, var(--bg-soft), rgba(4, 4, 5, 0.62));
-  box-shadow: var(--shadow);
+  background: var(--panel);
+  box-shadow: var(--shadow-soft);
 }
 
 .info-panel {
@@ -476,10 +456,10 @@ input {
 
 .control-button {
   min-height: 42px;
-  border: 1px solid var(--line-muted);
+  border: 0;
   border-radius: 16px;
   color: var(--muted);
-  background: rgba(5, 5, 6, 0.72);
+  background: var(--panel-raised);
   cursor: pointer;
   font-size: 0.68rem;
   letter-spacing: 0.1em;
@@ -491,9 +471,8 @@ input {
 }
 
 .control-button:hover:not(:disabled) {
-  border-color: rgba(244, 240, 232, 0.36);
   color: var(--text);
-  background: rgba(19, 19, 20, 0.78);
+  background: #141416;
 }
 
 .control-button:active:not(:disabled) {
@@ -506,9 +485,9 @@ input {
 }
 
 .control-button[data-active="true"] {
-  border-color: var(--orange-soft);
   color: var(--text);
-  background: linear-gradient(160deg, rgba(240, 109, 50, 0.2), rgba(10, 10, 11, 0.82));
+  background: linear-gradient(160deg, #2a160d, #111113);
+  box-shadow: inset 0 0 0 1px rgba(240, 109, 50, 0.22);
 }
 
 .maplibregl-ctrl-attrib {
@@ -523,55 +502,14 @@ input {
   color: rgba(244, 240, 232, 0.76);
 }
 
-.user-marker {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  border: 0;
-  border-radius: 50%;
-  background: #fffaf0;
-  box-shadow:
-    0 0 12px rgba(244, 240, 232, 0.56),
-    0 0 26px rgba(240, 109, 50, 0.34);
-}
-
-.user-marker::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border: 1px solid rgba(244, 240, 232, 0.64);
-  border-radius: 50%;
-  background: transparent;
-}
-
-.user-marker__pulse {
-  position: absolute;
-  inset: -18px;
-  border: 1px solid rgba(240, 109, 50, 0.44);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(240, 109, 50, 0.18), transparent 62%);
-  animation: marker-pulse 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
-.destination-marker {
-  width: 18px;
-  height: 18px;
-  border: 2px solid #fffaf0;
-  border-radius: 50%;
-  background: rgba(226, 111, 34, 0.72);
-  box-shadow:
-    0 0 0 6px rgba(226, 111, 34, 0.14),
-    0 0 24px rgba(255, 250, 240, 0.34);
-}
-
 .orra-logo-fixed {
   position: absolute;
   left: 18px;
   bottom: 18px;
   z-index: 6;
-  width: 54px;
-  height: 54px;
-  opacity: 0.82;
+  width: 72px;
+  height: 72px;
+  opacity: 0.9;
   filter: invert(1);
   pointer-events: none;
 }
@@ -591,20 +529,6 @@ input {
   width: min(220px, 42vw);
   height: min(220px, 42vw);
   animation: splash-mark 2.1s ease forwards;
-}
-
-@keyframes marker-pulse {
-  0% {
-    opacity: 0.72;
-    transform: scale(0.34);
-  }
-  70% {
-    opacity: 0.18;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.86);
-  }
 }
 
 @keyframes splash-fade {
@@ -665,30 +589,23 @@ input {
   }
 
   .compass-rose {
-    left: 14px;
-    bottom: 168px;
-    grid-template-columns: 24px 64px 24px;
-    gap: 6px;
-  }
-
-  .compass-rose__dial {
+    top: 86px;
+    right: 12px;
     width: 64px;
     height: 64px;
     border-radius: 22px;
   }
 
-  .compass-rose__turn {
-    width: 24px;
-    height: 38px;
-    border-radius: 13px;
+  .compass-rose__needle {
+    inset: 18px;
   }
 
   .orra-logo-fixed {
     bottom: 128px;
     top: auto;
     left: 16px;
-    width: 40px;
-    height: 40px;
+    width: 54px;
+    height: 54px;
   }
 }
 

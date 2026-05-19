@@ -16,12 +16,14 @@ import {
 } from "@/lib/geolocation";
 import {
   addOpenTopographyOverlay,
+  clearDestinationPositionOverlay,
   clearRouteOverlay,
   OPENFREE_MAP_STYLE,
-  removeOpenTopographyOverlay,
   setRouteOverlay,
+  setDestinationPositionOverlay,
   setOpenBuildingsVisibility,
   setOpenStreetVisibility,
+  setUserPositionOverlay,
   updateTopographyGrid,
 } from "@/lib/open-maps";
 import { getOpenRoute, splitRouteAtPoint } from "@/lib/routing";
@@ -33,11 +35,11 @@ import type {
   RouteState,
   SearchResult,
 } from "@/types/map";
-import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
+import type { Map as MapLibreMap } from "maplibre-gl";
 
 type MapLibreRuntime = Pick<
   typeof import("maplibre-gl"),
-  "AttributionControl" | "Map" | "Marker"
+  "AttributionControl" | "Map"
 >;
 
 type SearchStatus = "idle" | "searching" | "error";
@@ -49,8 +51,8 @@ type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<PermissionState>;
 };
 
-const TOPO_ZOOM = 17.25;
-const TOPO_PITCH = 82;
+const TOPO_ZOOM = 18.05;
+const TOPO_PITCH = 84.5;
 const GPS_OVERVIEW_ZOOM = 15.1;
 const GPS_OVERVIEW_PITCH = 28;
 const DEFAULT_BEARING = -28;
@@ -80,8 +82,6 @@ export function MapView() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const maplibreRef = useRef<MapLibreRuntime | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markerRef = useRef<MapLibreMarker | null>(null);
-  const destinationMarkerRef = useRef<MapLibreMarker | null>(null);
   const watchPositionRef = useRef<number | null>(null);
   const centerElevationAbortRef = useRef<AbortController | null>(null);
   const userElevationAbortRef = useRef<AbortController | null>(null);
@@ -95,6 +95,8 @@ export function MapView() {
   const orientationEnabledRef = useRef(false);
   const deviceHeadingRef = useRef<number | null>(null);
   const orientationFrameRef = useRef<number | null>(null);
+  const positionPulseFrameRef = useRef<number | null>(null);
+  const positionPulseLastFrameRef = useRef(0);
   const orientationHandlerRef = useRef<
     ((event: DeviceOrientationEvent) => void) | null
   >(null);
@@ -128,54 +130,22 @@ export function MapView() {
 
   const setUserMarker = useCallback((location: GeoPoint) => {
     const map = mapRef.current;
-    const maplibre = maplibreRef.current;
 
-    if (!map || !maplibre) {
+    if (!map || !map.isStyleLoaded()) {
       return;
     }
 
-    if (!markerRef.current) {
-      const markerElement = document.createElement("div");
-      markerElement.className = "user-marker";
-
-      const pulseElement = document.createElement("span");
-      pulseElement.className = "user-marker__pulse";
-      markerElement.appendChild(pulseElement);
-
-      markerRef.current = new maplibre.Marker({
-        anchor: "center",
-        element: markerElement,
-      })
-        .setLngLat([location.longitude, location.latitude])
-        .addTo(map);
-      return;
-    }
-
-    markerRef.current.setLngLat([location.longitude, location.latitude]);
+    setUserPositionOverlay(map, location);
   }, []);
 
   const setDestinationMarker = useCallback((result: SearchResult) => {
     const map = mapRef.current;
-    const maplibre = maplibreRef.current;
 
-    if (!map || !maplibre) {
+    if (!map || !map.isStyleLoaded()) {
       return;
     }
 
-    if (!destinationMarkerRef.current) {
-      const markerElement = document.createElement("div");
-      markerElement.className = "destination-marker";
-
-      destinationMarkerRef.current = new maplibre.Marker({
-        anchor: "center",
-        element: markerElement,
-      })
-        .setLngLat([result.longitude, result.latitude])
-        .addTo(map);
-      return;
-    }
-
-    destinationMarkerRef.current.setLngLat([result.longitude, result.latitude]);
+    setDestinationPositionOverlay(map, result);
   }, []);
 
   const updateRouteOverlay = useCallback(
@@ -187,6 +157,9 @@ export function MapView() {
       }
 
       setRouteOverlay(map, splitRouteAtPoint(coordinates, userLocation));
+      if (userLocation) {
+        setUserPositionOverlay(map, userLocation);
+      }
     },
     [],
   );
@@ -196,16 +169,32 @@ export function MapView() {
       return;
     }
 
-    const center = map.getCenter();
+    updateTopographyGrid(map, userLocationRef.current);
+  }, []);
 
-    updateTopographyGrid(
-      map,
-      {
-        latitude: center.lat,
-        longitude: center.lng,
-      },
-      map.getZoom(),
-    );
+  const startPositionPulse = useCallback(() => {
+    if (positionPulseFrameRef.current !== null) {
+      return;
+    }
+
+    const renderPulse = (timestamp: number) => {
+      const map = mapRef.current;
+      const location = userLocationRef.current;
+
+      if (
+        map?.isStyleLoaded() &&
+        location &&
+        timestamp - positionPulseLastFrameRef.current > 80
+      ) {
+        const pulse = (Math.sin(timestamp / 720) + 1) / 2;
+        setUserPositionOverlay(map, location, pulse);
+        positionPulseLastFrameRef.current = timestamp;
+      }
+
+      positionPulseFrameRef.current = window.requestAnimationFrame(renderPulse);
+    };
+
+    positionPulseFrameRef.current = window.requestAnimationFrame(renderPulse);
   }, []);
 
   const centerMapOn = useCallback((location: GeoPoint): boolean => {
@@ -219,6 +208,7 @@ export function MapView() {
       center: [location.longitude, location.latitude],
       zoom: Math.max(map.getZoom(), TOPO_ZOOM),
       pitch: TOPO_PITCH,
+      offset: topoCameraOffset(),
       bearing:
         deviceHeadingRef.current ??
         (typeof location.heading === "number" ? location.heading : DEFAULT_BEARING),
@@ -229,7 +219,7 @@ export function MapView() {
     return true;
   }, []);
 
-  const rotateMapBy = useCallback((delta: number) => {
+  const resetBearingNorth = useCallback(() => {
     const map = mapRef.current;
 
     if (!map) {
@@ -238,8 +228,8 @@ export function MapView() {
 
     topoTrackingRef.current = false;
     map.easeTo({
-      bearing: map.getBearing() + delta,
-      duration: 280,
+      bearing: 0,
+      duration: 520,
       essential: true,
     });
   }, []);
@@ -318,10 +308,15 @@ export function MapView() {
         geolocationError: null,
       }));
       setUserMarker(location);
+      startPositionPulse();
       if (routeCoordinatesRef.current.length >= 2) {
         updateRouteOverlay(routeCoordinatesRef.current, location);
       }
       void refreshElevation(location, "user");
+
+      if (mapReadyRef.current && mapRef.current) {
+        refreshTopographyGrid(mapRef.current);
+      }
 
       if (
         topoTrackingRef.current &&
@@ -335,7 +330,14 @@ export function MapView() {
           : false;
       }
     },
-    [centerMapOn, refreshElevation, setUserMarker, updateRouteOverlay],
+    [
+      centerMapOn,
+      refreshElevation,
+      refreshTopographyGrid,
+      setUserMarker,
+      startPositionPulse,
+      updateRouteOverlay,
+    ],
   );
 
   const startLivePositionWatch = useCallback(() => {
@@ -541,7 +543,7 @@ export function MapView() {
           container: mapContainerRef.current,
           fadeDuration: 0,
           maxPitch: 85,
-          maxZoom: 18.5,
+          maxZoom: 19.25,
           minZoom: 2,
           pitch: INITIAL_PITCH,
           style: OPENFREE_MAP_STYLE,
@@ -588,6 +590,7 @@ export function MapView() {
 
           if (initialTelemetry.terrainEnabled) {
             addOpenTopographyOverlay(map);
+            void startDeviceOrientation();
           }
 
           setOpenBuildingsVisibility(map, initialTelemetry.buildingsEnabled);
@@ -675,6 +678,10 @@ export function MapView() {
       if (orientationFrameRef.current !== null) {
         window.cancelAnimationFrame(orientationFrameRef.current);
       }
+      if (positionPulseFrameRef.current !== null) {
+        window.cancelAnimationFrame(positionPulseFrameRef.current);
+        positionPulseFrameRef.current = null;
+      }
       if (orientationHandlerRef.current) {
         window.removeEventListener(
           "deviceorientation",
@@ -689,19 +696,21 @@ export function MapView() {
           .removeEventListener("gesturechange", gestureChangeHandler);
       }
       if (activeMap) {
+        clearDestinationPositionOverlay(activeMap);
         clearRouteOverlay(activeMap);
       }
-      markerRef.current?.remove();
-      markerRef.current = null;
-      destinationMarkerRef.current?.remove();
-      destinationMarkerRef.current = null;
       activeMap?.remove();
       mapRef.current = null;
       maplibreRef.current = null;
       mapReadyRef.current = false;
       setMapReady(false);
     };
-  }, [refreshElevation, refreshTopographyGrid, updateTelemetryFromMap]);
+  }, [
+    refreshElevation,
+    refreshTopographyGrid,
+    startDeviceOrientation,
+    updateTelemetryFromMap,
+  ]);
 
   useEffect(() => {
     if (
@@ -710,9 +719,20 @@ export function MapView() {
       !centeredOnUserRef.current
     ) {
       setUserMarker(telemetry.userLocation);
+      startPositionPulse();
+      if (mapRef.current) {
+        refreshTopographyGrid(mapRef.current);
+      }
       centeredOnUserRef.current = centerMapOn(telemetry.userLocation);
     }
-  }, [centerMapOn, mapReady, setUserMarker, telemetry.userLocation]);
+  }, [
+    centerMapOn,
+    mapReady,
+    refreshTopographyGrid,
+    setUserMarker,
+    startPositionPulse,
+    telemetry.userLocation,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -803,6 +823,7 @@ export function MapView() {
 
       routeCoordinatesRef.current = route.coordinates;
       updateRouteOverlay(route.coordinates, userLocationRef.current);
+      setDestinationMarker(result);
       setRouteState({
         destination: result,
         coordinates: route.coordinates,
@@ -853,10 +874,9 @@ export function MapView() {
     routeAbortRef.current?.abort();
     routeCoordinatesRef.current = [];
     setRouteState(null);
-    destinationMarkerRef.current?.remove();
-    destinationMarkerRef.current = null;
 
     if (mapRef.current) {
+      clearDestinationPositionOverlay(mapRef.current);
       clearRouteOverlay(mapRef.current);
     }
   };
@@ -873,38 +893,29 @@ export function MapView() {
       initialOverlayTimerRef.current = null;
     }
 
-    const shouldEnterTopo =
-      !telemetry.terrainEnabled || currentViewModeRef.current !== "topo";
+    refreshTopographyGrid(map);
+    addOpenTopographyOverlay(map);
+    topoTrackingRef.current = true;
+    currentViewModeRef.current = "topo";
+    setViewMode("topo");
+    void startDeviceOrientation();
 
-    if (shouldEnterTopo) {
-      refreshTopographyGrid(map);
-      addOpenTopographyOverlay(map);
-      topoTrackingRef.current = true;
-      currentViewModeRef.current = "topo";
-      setViewMode("topo");
-      void startDeviceOrientation();
-
-      if (userLocationRef.current) {
-        centeredOnUserRef.current = centerMapOn(userLocationRef.current);
-      } else {
-        map.easeTo({
-          bearing: deviceHeadingRef.current ?? map.getBearing() ?? DEFAULT_BEARING,
-          pitch: TOPO_PITCH,
-          zoom: Math.max(map.getZoom(), TOPO_ZOOM),
-          duration: 900,
-          essential: true,
-        });
-      }
+    if (userLocationRef.current) {
+      centeredOnUserRef.current = centerMapOn(userLocationRef.current);
     } else {
-      topoTrackingRef.current = false;
-      currentViewModeRef.current = "gps";
-      setViewMode("gps");
-      removeOpenTopographyOverlay(map);
+      map.easeTo({
+        bearing: deviceHeadingRef.current ?? map.getBearing() ?? DEFAULT_BEARING,
+        offset: topoCameraOffset(),
+        pitch: TOPO_PITCH,
+        zoom: Math.max(map.getZoom(), TOPO_ZOOM),
+        duration: 900,
+        essential: true,
+      });
     }
 
     setTelemetry((current) => ({
       ...current,
-      terrainEnabled: shouldEnterTopo,
+      terrainEnabled: true,
     }));
   };
 
@@ -986,29 +997,22 @@ export function MapView() {
         onClearRoute={handleClearRoute}
       />
 
-      <div className="compass-rose" aria-label="Rose des vents">
-        <button
-          className="compass-rose__turn compass-rose__turn--left"
-          type="button"
-          onClick={() => rotateMapBy(-18)}
-          aria-label="Tourner à gauche"
-        />
-        <div
-          className="compass-rose__dial"
+      <button
+        className="compass-rose"
+        type="button"
+        onClick={resetBearingNorth}
+        aria-label="Recaler la carte au nord"
+        title="Nord"
+      >
+        <span className="compass-rose__corner compass-rose__corner--n">N</span>
+        <span className="compass-rose__corner compass-rose__corner--e">E</span>
+        <span className="compass-rose__corner compass-rose__corner--s">S</span>
+        <span className="compass-rose__corner compass-rose__corner--w">W</span>
+        <span
+          className="compass-rose__needle"
           style={{ transform: `rotate(${-telemetry.bearing}deg)` }}
-        >
-          <span>N</span>
-          <span>E</span>
-          <span>S</span>
-          <span>W</span>
-        </div>
-        <button
-          className="compass-rose__turn compass-rose__turn--right"
-          type="button"
-          onClick={() => rotateMapBy(18)}
-          aria-label="Tourner à droite"
         />
-      </div>
+      </button>
 
       <div className="panel-stack">
         <InfoPanel telemetry={telemetry} />
@@ -1053,6 +1057,14 @@ function browserSupportsWebGL(): boolean {
 
 function normalizeBearing(value: number): number {
   return ((value % 360) + 360) % 360;
+}
+
+function topoCameraOffset(): [number, number] {
+  if (typeof window === "undefined") {
+    return [0, 0];
+  }
+
+  return [0, Math.round(window.innerHeight * 0.22)];
 }
 
 function getCoordinateBounds(

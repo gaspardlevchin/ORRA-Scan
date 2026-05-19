@@ -21,15 +21,15 @@ Aucune clé Mapbox n'est nécessaire pour le fonctionnement par défaut.
 - Carte mondiale vectorielle open source.
 - Style carte maison minimal, sans labels ni POI visibles par défaut, avec rues gris sombre désactivables.
 - Relief 3D DEM ouvert activé par défaut pour rendre les formes du terrain lisibles.
-- Grille topographique intégrée à la carte, blanche près du point de vue et orange plus loin.
+- Grille topographique intégrée à la carte, alignée nord-sud / est-ouest, orange au sol et blanche uniquement autour de la position GPS.
 - Bâtiments 3D extrudés activables ou désactivables quand les données OSM/OpenFreeMap sont disponibles.
-- Marqueur de position utilisateur avec point blanc et halo orange.
+- Marqueurs de position rendus dans la carte pour rester aplatis par la perspective du terrain.
 - Suivi GPS live via l'API Geolocation du navigateur.
 - Altitude terrain via Open-Meteo/Copernicus DEM.
 - Panneau d'informations compact et masquable : centre de carte, position utilisateur, altitude, zoom/pitch/cap et statut de géolocalisation, avec détails GPS au survol.
-- Contrôles : GPS, topo/relief, bâtiments 3D et rues.
+- Contrôles : GPS, topo POV, bâtiments 3D et rues.
 - Recherche de lieu ou coordonnées, avec trajet routé, distance par route et distance directe.
-- Rose des vents et rotation manuelle de la carte.
+- Rose des vents cliquable pour recaler la carte au nord.
 - Interface responsive desktop et mobile.
 - Premier chargement allégé : MapLibre est chargé dynamiquement, la carte utilise un style vectoriel réduit et les bâtiments 3D restent désactivés au démarrage.
 
