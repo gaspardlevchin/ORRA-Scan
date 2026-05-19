@@ -51,8 +51,10 @@ type DeviceOrientationEventConstructor = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<PermissionState>;
 };
 
-const TOPO_ZOOM = 18.05;
-const TOPO_PITCH = 84.5;
+const TOPO_ZOOM = 17.45;
+const TOPO_PITCH = 76;
+const TOPO_MIN_PITCH = 66;
+const TOPO_MAX_PITCH = 80;
 const GPS_OVERVIEW_ZOOM = 15.1;
 const GPS_OVERVIEW_PITCH = 28;
 const DEFAULT_BEARING = -28;
@@ -477,8 +479,15 @@ export function MapView() {
 
         orientationFrameRef.current = window.requestAnimationFrame(() => {
           orientationFrameRef.current = null;
-          mapRef.current?.easeTo({
+          const map = mapRef.current;
+
+          if (!map) {
+            return;
+          }
+
+          map.easeTo({
             bearing: heading,
+            pitch: pitchFromDeviceTilt(event.beta, map.getPitch()),
             duration: 120,
             essential: true,
           });
@@ -542,7 +551,7 @@ export function MapView() {
           center: [PARIS_CENTER.longitude, PARIS_CENTER.latitude],
           container: mapContainerRef.current,
           fadeDuration: 0,
-          maxPitch: 85,
+          maxPitch: TOPO_MAX_PITCH,
           maxZoom: 19.25,
           minZoom: 2,
           pitch: INITIAL_PITCH,
@@ -1064,7 +1073,20 @@ function topoCameraOffset(): [number, number] {
     return [0, 0];
   }
 
-  return [0, Math.round(window.innerHeight * 0.22)];
+  return [0, Math.round(window.innerHeight * 0.12)];
+}
+
+function pitchFromDeviceTilt(
+  beta: number | null | undefined,
+  currentPitch: number,
+): number {
+  if (typeof beta !== "number") {
+    return currentPitch;
+  }
+
+  const normalizedTilt = Math.min(Math.max((Math.abs(beta) - 20) / 56, 0), 1);
+
+  return TOPO_MIN_PITCH + normalizedTilt * (TOPO_MAX_PITCH - TOPO_MIN_PITCH);
 }
 
 function getCoordinateBounds(

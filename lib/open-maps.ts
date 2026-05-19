@@ -117,9 +117,9 @@ export const OPENFREE_MAP_STYLE: StyleSpecification = {
       },
       paint: {
         "hillshade-shadow-color": "#000000",
-        "hillshade-highlight-color": "#f2eee7",
-        "hillshade-accent-color": "#8f8a84",
-        "hillshade-exaggeration": 0.86,
+        "hillshade-highlight-color": "#fff7eb",
+        "hillshade-accent-color": "#aaa29a",
+        "hillshade-exaggeration": 1.04,
       },
     },
     {
@@ -248,7 +248,11 @@ export const OPENFREE_MAP_STYLE: StyleSpecification = {
         "fill-extrusion-color": [
           "interpolate",
           ["linear"],
-          ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+          [
+            "*",
+            ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+            0.86,
+          ],
           0,
           "#151617",
           35,
@@ -273,7 +277,7 @@ export const OPENFREE_MAP_STYLE: StyleSpecification = {
           ["get", "min_height"],
           0,
         ],
-        "fill-extrusion-opacity": 0.92,
+        "fill-extrusion-opacity": 0.86,
         "fill-extrusion-vertical-gradient": true,
       },
     },
@@ -296,7 +300,7 @@ export function addOpenTopographyOverlay(map: Map): void {
   if (map.getSource(ORRA_TERRAIN_SOURCE_ID)) {
     map.setTerrain({
       source: ORRA_TERRAIN_SOURCE_ID,
-      exaggeration: 1.55,
+      exaggeration: 1.85,
     });
   }
 
@@ -354,7 +358,11 @@ export function addOpenBuildings(map: Map): void {
         14,
         0,
         15.2,
-        ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+        [
+          "*",
+          ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+          0.86,
+        ],
       ],
       "fill-extrusion-base": [
         "coalesce",
@@ -362,7 +370,7 @@ export function addOpenBuildings(map: Map): void {
         ["get", "min_height"],
         0,
       ],
-      "fill-extrusion-opacity": 0.92,
+      "fill-extrusion-opacity": 0.86,
       "fill-extrusion-vertical-gradient": true,
     },
   };
@@ -530,9 +538,9 @@ export function updateTopographyGrid(
         },
         paint: {
           "line-color": "#e26f22",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.14, 17, 0.58],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.45, 18, 1.45],
-          "line-blur": 0.14,
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 6, 0.24, 14, 0.62, 18, 0.9],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.65, 14, 1.15, 18, 2.05],
+          "line-blur": 0.04,
         },
       },
       beforeLayerId,
@@ -552,9 +560,9 @@ export function updateTopographyGrid(
         },
         paint: {
           "line-color": "#fffaf0",
-          "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.26, 18, 0.88],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 13, 0.75, 18, 2.35],
-          "line-blur": 0.24,
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.42, 18, 0.96],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.1, 18, 3],
+          "line-blur": 0.16,
         },
       },
       beforeLayerId,
@@ -707,10 +715,34 @@ function createTopographyGrid(
   const userRadiusMeters = Math.max(spacingMeters * 2.25, 160);
   const latitudePadding = Math.max((north - south) * 0.32, latitudeStep * 5);
   const longitudePadding = Math.max(longitudeRange * 0.32, longitudeStep * 5);
-  const minLatitude = clampLatitude(south - latitudePadding);
-  const maxLatitude = clampLatitude(north + latitudePadding);
-  const minLongitude = west - longitudePadding;
-  const maxLongitude = west + longitudeRange + longitudePadding;
+  let minLatitude = clampLatitude(south - latitudePadding);
+  let maxLatitude = clampLatitude(north + latitudePadding);
+  let minLongitude = west - longitudePadding;
+  let maxLongitude = west + longitudeRange + longitudePadding;
+
+  if (userLocation) {
+    const userCoverageMeters = Math.max(spacingMeters * 14, 1200);
+    const userLatitudeCoverage = metersToLatitude(userCoverageMeters);
+    const userLongitudeCoverage = metersToLongitude(
+      userCoverageMeters,
+      userLocation.latitude,
+    );
+
+    minLatitude = clampLatitude(
+      Math.min(minLatitude, userLocation.latitude - userLatitudeCoverage),
+    );
+    maxLatitude = clampLatitude(
+      Math.max(maxLatitude, userLocation.latitude + userLatitudeCoverage),
+    );
+    minLongitude = Math.min(
+      minLongitude,
+      userLocation.longitude - userLongitudeCoverage,
+    );
+    maxLongitude = Math.max(
+      maxLongitude,
+      userLocation.longitude + userLongitudeCoverage,
+    );
+  }
   const startLatitude = snapDown(minLatitude, latitudeStep);
   const startLongitude = snapDown(minLongitude, longitudeStep);
   const features: TopographyGridGeoJson["features"] = [];
