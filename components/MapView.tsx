@@ -758,12 +758,14 @@ export function MapView() {
 
       const compactLayout = window.innerWidth < 760;
 
-      map.fitBounds(
-        [
-          [origin.longitude, origin.latitude],
-          [result.longitude, result.latitude],
-        ],
-        {
+      const routeBounds = getCoordinateBounds([
+        [origin.longitude, origin.latitude],
+        [result.longitude, result.latitude],
+        ...route.coordinates,
+      ]);
+
+      if (routeBounds) {
+        map.fitBounds(routeBounds, {
           bearing: currentViewModeRef.current === "gps" ? 0 : map.getBearing(),
           padding: compactLayout
             ? { bottom: 250, left: 28, right: 28, top: 136 }
@@ -773,8 +775,8 @@ export function MapView() {
               ? Math.max(map.getPitch(), 58)
               : GPS_OVERVIEW_PITCH,
           duration: 1100,
-        },
-      );
+        });
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
@@ -982,4 +984,44 @@ function browserSupportsWebGL(): boolean {
   } catch {
     return false;
   }
+}
+
+function getCoordinateBounds(
+  coordinates: LngLatTuple[],
+): [LngLatTuple, LngLatTuple] | null {
+  if (coordinates.length === 0) {
+    return null;
+  }
+
+  const bounds = coordinates.reduce(
+    (current, coordinate) => ({
+      west: Math.min(current.west, coordinate[0]),
+      south: Math.min(current.south, coordinate[1]),
+      east: Math.max(current.east, coordinate[0]),
+      north: Math.max(current.north, coordinate[1]),
+    }),
+    {
+      west: Number.POSITIVE_INFINITY,
+      south: Number.POSITIVE_INFINITY,
+      east: Number.NEGATIVE_INFINITY,
+      north: Number.NEGATIVE_INFINITY,
+    },
+  );
+
+  if (
+    !Number.isFinite(bounds.west) ||
+    !Number.isFinite(bounds.south) ||
+    !Number.isFinite(bounds.east) ||
+    !Number.isFinite(bounds.north)
+  ) {
+    return null;
+  }
+
+  const longitudePadding = Math.max((bounds.east - bounds.west) * 0.08, 0.001);
+  const latitudePadding = Math.max((bounds.north - bounds.south) * 0.08, 0.001);
+
+  return [
+    [bounds.west - longitudePadding, bounds.south - latitudePadding],
+    [bounds.east + longitudePadding, bounds.north + latitudePadding],
+  ];
 }
