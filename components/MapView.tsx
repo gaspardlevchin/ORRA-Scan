@@ -215,20 +215,30 @@ export function MapView() {
       return false;
     }
 
-    map.flyTo({
-      center: [location.longitude, location.latitude],
+    const camera = {
+      center: [location.longitude, location.latitude] as LngLatTuple,
       zoom: Math.max(map.getZoom(), TOPO_ZOOM),
       pitch: TOPO_PITCH,
-      offset: topoCameraOffset(),
       bearing:
         deviceHeadingRef.current ??
         (typeof location.heading === "number" ? location.heading : DEFAULT_BEARING),
-      duration: 1400,
-      essential: true,
-    });
+    };
+
+    if (map.loaded()) {
+      map.flyTo({
+        ...camera,
+        offset: topoCameraOffset(),
+        duration: 1400,
+        essential: true,
+      });
+    } else {
+      map.jumpTo(camera);
+    }
+
+    updateTelemetryFromMap(map);
 
     return true;
-  }, []);
+  }, [updateTelemetryFromMap]);
 
   const resetBearingNorth = useCallback(() => {
     const map = mapRef.current;
@@ -252,17 +262,27 @@ export function MapView() {
       return false;
     }
 
-    map.flyTo({
-      center: [location.longitude, location.latitude],
+    const camera = {
+      center: [location.longitude, location.latitude] as LngLatTuple,
       zoom: GPS_OVERVIEW_ZOOM,
       pitch: GPS_OVERVIEW_PITCH,
       bearing: 0,
-      duration: 1100,
-      essential: true,
-    });
+    };
+
+    if (map.loaded()) {
+      map.flyTo({
+        ...camera,
+        duration: 1100,
+        essential: true,
+      });
+    } else {
+      map.jumpTo(camera);
+    }
+
+    updateTelemetryFromMap(map);
 
     return true;
-  }, []);
+  }, [updateTelemetryFromMap]);
 
   const centerFallbackMapOn = useCallback((location: GeoPoint): boolean => {
     const map = mapRef.current;
@@ -271,17 +291,27 @@ export function MapView() {
       return false;
     }
 
-    map.easeTo({
-      center: [location.longitude, location.latitude],
+    const camera = {
+      center: [location.longitude, location.latitude] as LngLatTuple,
       zoom: INITIAL_ZOOM,
       pitch: INITIAL_PITCH,
       bearing: DEFAULT_BEARING,
-      duration: 900,
-      essential: true,
-    });
+    };
+
+    if (map.loaded()) {
+      map.easeTo({
+        ...camera,
+        duration: 900,
+        essential: true,
+      });
+    } else {
+      map.jumpTo(camera);
+    }
+
+    updateTelemetryFromMap(map);
 
     return true;
-  }, []);
+  }, [updateTelemetryFromMap]);
 
   const refreshElevation = useCallback(
     async (point: GeoPoint | { latitude: number; longitude: number }, target: "center" | "user") => {
