@@ -1,6 +1,7 @@
 import type { GeolocationStatus } from "@/types/map";
 
 type ControlPanelProps = {
+  gpsModeActive: boolean;
   topoModeActive: boolean;
   buildingsEnabled: boolean;
   roadsEnabled: boolean;
@@ -13,6 +14,7 @@ type ControlPanelProps = {
 };
 
 export function ControlPanel({
+  gpsModeActive,
   topoModeActive,
   buildingsEnabled,
   roadsEnabled,
@@ -30,6 +32,7 @@ export function ControlPanel({
       <button
         className="control-button"
         type="button"
+        data-active={gpsModeActive}
         onClick={onLocate}
         disabled={isLocating}
         aria-label="Me localiser"

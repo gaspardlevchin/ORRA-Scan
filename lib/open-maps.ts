@@ -26,277 +26,14 @@ export const ORRA_ROUTE_AHEAD_LAYER_ID = "orra-route-ahead";
 
 const BUILDING_SOURCE_LAYER = "building";
 const BUILDING_SOURCE_LAYER_NAMES = ["building", "buildings"];
-const STREET_LAYER_IDS = [
-  "waterway",
-  "road-major",
-  "road-secondary",
-  "road-minor",
-  "rail",
-  "boundary",
-];
+const ORRA_LAYER_PREFIX = "orra-";
 
-export const OPENFREE_MAP_STYLE: StyleSpecification = {
-  version: 8,
-  name: "ORRA minimal dark",
-  sources: {
-    [OPENMAPTILES_SOURCE_ID]: {
-      type: "vector",
-      url: "https://tiles.openfreemap.org/planet",
-      attribution:
-        'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, tiles by <a href="https://openfreemap.org">OpenFreeMap</a>',
-    },
-    [ORRA_TERRAIN_SOURCE_ID]: {
-      type: "raster-dem",
-      tiles: [
-        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      maxzoom: 14,
-      encoding: "terrarium",
-      attribution:
-        'Terrain tiles by <a href="https://github.com/tilezen/joerd">Mapzen</a>',
-    },
-  },
-  layers: [
-    {
-      id: "background",
-      type: "background",
-      paint: {
-        "background-color": "#030303",
-      },
-    },
-    {
-      id: "landcover",
-      type: "fill",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "landcover",
-      paint: {
-        "fill-color": [
-          "match",
-          ["get", "class"],
-          "ice",
-          "#151719",
-          "wood",
-          "#090d0b",
-          "grass",
-          "#080a08",
-          "sand",
-          "#11100d",
-          "#070707",
-        ],
-        "fill-opacity": 0.5,
-      },
-    },
-    {
-      id: "landuse-soft",
-      type: "fill",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "landuse",
-      minzoom: 9,
-      paint: {
-        "fill-color": "#080808",
-        "fill-opacity": 0.42,
-      },
-    },
-    {
-      id: "water",
-      type: "fill",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "water",
-      paint: {
-        "fill-color": "#05080a",
-        "fill-opacity": 0.92,
-      },
-    },
-    {
-      id: ORRA_TERRAIN_LAYER_ID,
-      type: "hillshade",
-      source: ORRA_TERRAIN_SOURCE_ID,
-      layout: {
-        visibility: "none",
-      },
-      paint: {
-        "hillshade-shadow-color": "#000000",
-        "hillshade-highlight-color": "#fff7eb",
-        "hillshade-accent-color": "#aaa29a",
-        "hillshade-exaggeration": 1.04,
-      },
-    },
-    {
-      id: "waterway",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "waterway",
-      minzoom: 10,
-      filter: ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
-      paint: {
-        "line-color": "#2f3f43",
-        "line-opacity": 0.55,
-        "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 10, 0.35, 18, 3],
-      },
-    },
-    {
-      id: "road-major",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "transportation",
-      filter: [
-        "all",
-        ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
-        ["match", ["get", "class"], ["motorway", "trunk", "primary"], true, false],
-      ],
-      layout: {
-        "line-cap": "round",
-        "line-join": "round",
-      },
-      paint: {
-        "line-color": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          7,
-          "#292a2c",
-          12,
-          "#4b4b4a",
-          16,
-          "#8a8680",
-        ],
-        "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.22, 13, 0.76],
-        "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 5, 0.35, 12, 1.2, 18, 8],
-      },
-    },
-    {
-      id: "road-secondary",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "transportation",
-      minzoom: 10,
-      filter: [
-        "all",
-        ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
-        ["match", ["get", "class"], ["secondary", "tertiary"], true, false],
-      ],
-      layout: {
-        "line-cap": "round",
-        "line-join": "round",
-      },
-      paint: {
-        "line-color": "#464849",
-        "line-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0.18, 15, 0.58],
-        "line-width": ["interpolate", ["exponential", 1.22], ["zoom"], 10, 0.35, 15, 1.4, 18, 5],
-      },
-    },
-    {
-      id: "road-minor",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "transportation",
-      minzoom: 13,
-      filter: [
-        "all",
-        ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false],
-        ["match", ["get", "class"], ["minor", "service", "track", "path"], true, false],
-      ],
-      layout: {
-        "line-cap": "round",
-        "line-join": "round",
-      },
-      paint: {
-        "line-color": "#747474",
-        "line-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.1, 16, 0.42],
-        "line-width": ["interpolate", ["exponential", 1.25], ["zoom"], 13, 0.2, 16, 0.9, 18, 3],
-      },
-    },
-    {
-      id: "rail",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "transportation",
-      minzoom: 12,
-      filter: ["==", ["get", "class"], "rail"],
-      paint: {
-        "line-color": "#757575",
-        "line-opacity": 0.38,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.25, 18, 1.4],
-      },
-    },
-    {
-      id: ORRA_BUILDING_FOOTPRINT_LAYER_ID,
-      type: "fill",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": BUILDING_SOURCE_LAYER,
-      minzoom: 13,
-      layout: {
-        visibility: "none",
-      },
-      paint: {
-        "fill-color": "#111214",
-        "fill-outline-color": "#2c2d2f",
-        "fill-opacity": ["interpolate", ["linear"], ["zoom"], 13, 0.18, 15, 0.46],
-      },
-    },
-    {
-      id: ORRA_BUILDINGS_LAYER_ID,
-      type: "fill-extrusion",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": BUILDING_SOURCE_LAYER,
-      minzoom: 14.2,
-      layout: {
-        visibility: "none",
-      },
-      paint: {
-        "fill-extrusion-color": [
-          "interpolate",
-          ["linear"],
-          [
-            "*",
-            ["coalesce", ["get", "render_height"], ["get", "height"], 12],
-            0.86,
-          ],
-          0,
-          "#151617",
-          35,
-          "#353637",
-          95,
-          "#a7a39b",
-          180,
-          "#d7cec2",
-        ],
-        "fill-extrusion-height": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          14,
-          0,
-          15.2,
-          ["coalesce", ["get", "render_height"], ["get", "height"], 12],
-        ],
-        "fill-extrusion-base": [
-          "coalesce",
-          ["get", "render_min_height"],
-          ["get", "min_height"],
-          0,
-        ],
-        "fill-extrusion-opacity": 0.86,
-        "fill-extrusion-vertical-gradient": true,
-      },
-    },
-    {
-      id: "boundary",
-      type: "line",
-      source: OPENMAPTILES_SOURCE_ID,
-      "source-layer": "boundary",
-      minzoom: 4,
-      paint: {
-        "line-color": "#353535",
-        "line-opacity": 0.34,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 0.25, 10, 0.8],
-      },
-    },
-  ],
-};
+export const OPENFREE_MAP_STYLE_URL =
+  "https://tiles.openfreemap.org/styles/dark";
 
 export function addOpenTopographyOverlay(map: Map): void {
+  ensureOpenTerrainOverlay(map);
+
   if (map.getSource(ORRA_TERRAIN_SOURCE_ID)) {
     map.setTerrain({
       source: ORRA_TERRAIN_SOURCE_ID,
@@ -315,8 +52,97 @@ export function removeOpenTopographyOverlay(map: Map): void {
 }
 
 export function setOpenStreetVisibility(map: Map, visible: boolean): void {
-  for (const layerId of STREET_LAYER_IDS) {
-    setLayerVisibility(map, layerId, visible);
+  for (const layer of map.getStyle().layers ?? []) {
+    if (isOrraLayer(layer.id) || !isStreetLikeLayer(layer.id)) {
+      continue;
+    }
+
+    setLayerVisibility(map, layer.id, visible);
+  }
+}
+
+export function applyOrraBaseStyle(map: Map): void {
+  ensureOpenTerrainOverlay(map);
+
+  for (const layer of map.getStyle().layers ?? []) {
+    if (isOrraLayer(layer.id)) {
+      continue;
+    }
+
+    if (layer.type === "symbol") {
+      setLayerVisibility(map, layer.id, false);
+      continue;
+    }
+
+    if (layer.type === "line" && isStreetLikeLayer(layer.id)) {
+      setPaintProperty(map, layer.id, "line-color", [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        6,
+        "#171819",
+        12,
+        "#343536",
+        17,
+        "#686868",
+      ]);
+      setPaintProperty(map, layer.id, "line-opacity", [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        5,
+        0.14,
+        13,
+        0.58,
+        18,
+        0.74,
+      ]);
+    }
+
+    if (layer.type === "background") {
+      setPaintProperty(map, layer.id, "background-color", "#030303");
+    }
+
+    if (layer.type === "fill" && layer.id.toLowerCase().includes("water")) {
+      setPaintProperty(map, layer.id, "fill-color", "#050607");
+      setPaintProperty(map, layer.id, "fill-opacity", 0.88);
+    }
+  }
+}
+
+export function ensureOpenTerrainOverlay(map: Map): void {
+  if (!map.getSource(ORRA_TERRAIN_SOURCE_ID)) {
+    map.addSource(ORRA_TERRAIN_SOURCE_ID, {
+      type: "raster-dem",
+      tiles: [
+        "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      maxzoom: 14,
+      encoding: "terrarium",
+      attribution:
+        'Terrain tiles by <a href="https://github.com/tilezen/joerd">Mapzen</a>',
+    } satisfies StyleSourceSpecification);
+  }
+
+  if (!map.getLayer(ORRA_TERRAIN_LAYER_ID)) {
+    map.addLayer(
+      {
+        id: ORRA_TERRAIN_LAYER_ID,
+        type: "hillshade",
+        source: ORRA_TERRAIN_SOURCE_ID,
+        layout: {
+          visibility: "none",
+        },
+        paint: {
+          "hillshade-shadow-color": "#000000",
+          "hillshade-highlight-color": "#efe9df",
+          "hillshade-accent-color": "#8f8b85",
+          "hillshade-exaggeration": 1.18,
+        },
+      },
+      firstBuildingOrSymbolLayerId(map),
+    );
   }
 }
 
@@ -375,22 +201,34 @@ export function addOpenBuildings(map: Map): void {
     },
   };
 
-  map.addLayer(buildingLayer, firstSymbolLayerId(map));
+  try {
+    map.addLayer(buildingLayer, firstSymbolLayerId(map));
+  } catch {
+    showExistingBuildingLayers(map, true);
+  }
 }
 
 export function setOpenBuildingsVisibility(map: Map, visible: boolean): void {
-  if (!map.getLayer(ORRA_BUILDINGS_LAYER_ID) && visible) {
-    addOpenBuildings(map);
-  }
+  try {
+    if (!map.getLayer(ORRA_BUILDINGS_LAYER_ID) && visible) {
+      addOpenBuildings(map);
+    }
 
-  setLayerVisibility(map, ORRA_BUILDING_FOOTPRINT_LAYER_ID, visible);
-  setLayerVisibility(map, ORRA_BUILDINGS_LAYER_ID, visible);
-  showExistingBuildingLayers(map, visible);
+    setLayerVisibility(map, ORRA_BUILDING_FOOTPRINT_LAYER_ID, visible);
+    setLayerVisibility(map, ORRA_BUILDINGS_LAYER_ID, visible);
+    showExistingBuildingLayers(map, visible);
+  } catch {
+    showExistingBuildingLayers(map, visible);
+  }
 }
 
 function setLayerVisibility(map: Map, layerId: string, visible: boolean): void {
   if (map.getLayer(layerId)) {
-    map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    try {
+      map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+    } catch {
+      // The remote style can replace layers while its tiles are still settling.
+    }
   }
 }
 
@@ -402,7 +240,7 @@ function showExistingBuildingLayers(map: Map, visible: boolean): void {
       (layer.type === "fill-extrusion" ||
         layer.id.toLowerCase().includes("building"))
     ) {
-      map.setLayoutProperty(layer.id, "visibility", visible ? "visible" : "none");
+      setLayerVisibility(map, layer.id, visible);
     }
   }
 }
@@ -448,6 +286,52 @@ function findBuildingSource(
 function firstSymbolLayerId(map: Map): string | undefined {
   return (map.getStyle().layers ?? []).find((layer) => layer.type === "symbol")
     ?.id;
+}
+
+function firstBuildingOrSymbolLayerId(map: Map): string | undefined {
+  return (map.getStyle().layers ?? []).find(
+    (layer) =>
+      layer.id.toLowerCase().includes("building") || layer.type === "symbol",
+  )?.id;
+}
+
+function setPaintProperty(
+  map: Map,
+  layerId: string,
+  property: string,
+  value: unknown,
+): void {
+  try {
+    if (map.getLayer(layerId)) {
+      map.setPaintProperty(layerId, property, value);
+    }
+  } catch {
+    // Some official style layers do not support every paint property variant.
+  }
+}
+
+function isOrraLayer(layerId: string): boolean {
+  return layerId.startsWith(ORRA_LAYER_PREFIX);
+}
+
+function isStreetLikeLayer(layerId: string): boolean {
+  const id = layerId.toLowerCase();
+
+  return (
+    id.includes("road") ||
+    id.includes("street") ||
+    id.includes("highway") ||
+    id.includes("transport") ||
+    id.includes("path") ||
+    id.includes("track") ||
+    id.includes("bridge") ||
+    id.includes("tunnel") ||
+    id.includes("rail") ||
+    id.includes("ferry") ||
+    id.includes("aeroway") ||
+    id.includes("waterway") ||
+    id.includes("boundary")
+  );
 }
 
 type TopographyGridGeoJson = {

@@ -16,9 +16,10 @@ import {
 } from "@/lib/geolocation";
 import {
   addOpenTopographyOverlay,
+  applyOrraBaseStyle,
   clearDestinationPositionOverlay,
   clearRouteOverlay,
-  OPENFREE_MAP_STYLE,
+  OPENFREE_MAP_STYLE_URL,
   setRouteOverlay,
   setDestinationPositionOverlay,
   setOpenBuildingsVisibility,
@@ -595,7 +596,7 @@ export function MapView() {
           maxZoom: 19.25,
           minZoom: 2,
           pitch: INITIAL_PITCH,
-          style: OPENFREE_MAP_STYLE,
+          style: OPENFREE_MAP_STYLE_URL,
           zoom: INITIAL_ZOOM,
         });
 
@@ -636,6 +637,7 @@ export function MapView() {
           }
 
           try {
+            applyOrraBaseStyle(map);
             refreshTopographyGrid(map);
 
             if (initialTelemetry.terrainEnabled) {
@@ -658,8 +660,13 @@ export function MapView() {
             return;
           }
 
-          setUserPositionOverlay(map, location);
-          refreshTopographyGrid(map);
+          try {
+            applyOrraBaseStyle(map);
+            setUserPositionOverlay(map, location);
+            refreshTopographyGrid(map);
+          } catch {
+            // The style can still be settling; scheduled retries will run again.
+          }
           centeredOnUserRef.current = centerMapOn(location);
         };
         const scheduleLoadedUserCenter = (delay: number) => {
@@ -997,8 +1004,17 @@ export function MapView() {
       initialOverlayTimerRef.current = null;
     }
 
-    refreshTopographyGrid(map);
-    addOpenTopographyOverlay(map);
+    try {
+      applyOrraBaseStyle(map);
+      refreshTopographyGrid(map);
+      addOpenTopographyOverlay(map);
+    } catch {
+      setTelemetry((current) => ({
+        ...current,
+        geolocationError: "Le mode topo se charge encore. Réessayez dans un instant.",
+      }));
+      return;
+    }
     topoTrackingRef.current = true;
     currentViewModeRef.current = "topo";
     setViewMode("topo");
@@ -1033,7 +1049,14 @@ export function MapView() {
     setTelemetry((current) => {
       const nextValue = !current.roadsEnabled;
 
-      setOpenStreetVisibility(map, nextValue);
+      try {
+        setOpenStreetVisibility(map, nextValue);
+      } catch {
+        return {
+          ...current,
+          geolocationError: "Les rues ne sont pas encore prêtes sur cette zone.",
+        };
+      }
 
       return {
         ...current,
@@ -1056,19 +1079,32 @@ export function MapView() {
 
     setTelemetry((current) => {
       const nextValue = !current.buildingsEnabled;
-      setOpenBuildingsVisibility(map, nextValue);
+
+      try {
+        setOpenBuildingsVisibility(map, nextValue);
+      } catch {
+        return {
+          ...current,
+          geolocationError:
+            "Bâtiments 3D indisponibles pour le moment sur cette zone.",
+        };
+      }
 
       if (nextValue) {
-        map.easeTo({
-          bearing: map.getBearing() || DEFAULT_BEARING,
-          pitch:
-            currentViewModeRef.current === "topo"
-              ? TOPO_PITCH
-              : GPS_OVERVIEW_PITCH,
-          zoom: Math.max(map.getZoom(), GPS_OVERVIEW_ZOOM),
-          duration: 900,
-          essential: true,
-        });
+        try {
+          map.easeTo({
+            bearing: map.getBearing() || DEFAULT_BEARING,
+            pitch:
+              currentViewModeRef.current === "topo"
+                ? TOPO_PITCH
+                : GPS_OVERVIEW_PITCH,
+            zoom: Math.max(map.getZoom(), GPS_OVERVIEW_ZOOM),
+            duration: 900,
+            essential: true,
+          });
+        } catch {
+          // The layer toggle succeeded; camera can wait for the next interaction.
+        }
       }
 
       return {
@@ -1121,6 +1157,7 @@ export function MapView() {
       <div className="panel-stack">
         <InfoPanel telemetry={telemetry} />
         <ControlPanel
+          gpsModeActive={viewMode === "gps"}
           topoModeActive={telemetry.terrainEnabled && viewMode === "topo"}
           buildingsEnabled={telemetry.buildingsEnabled}
           roadsEnabled={telemetry.roadsEnabled}
