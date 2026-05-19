@@ -71,6 +71,8 @@ export function applyOrraBaseStyle(map: Map): void {
 
     if (layer.type === "symbol") {
       setLayerVisibility(map, layer.id, false);
+      setPaintProperty(map, layer.id, "text-opacity", 0);
+      setPaintProperty(map, layer.id, "icon-opacity", 0);
       continue;
     }
 

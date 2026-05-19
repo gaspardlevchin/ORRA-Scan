@@ -618,6 +618,17 @@ export function MapView() {
         );
 
         const handleMapUpdate = () => updateTelemetryFromMap(map);
+        const handleStyleRefresh = () => {
+          if (mapRef.current !== map) {
+            return;
+          }
+
+          try {
+            applyOrraBaseStyle(map);
+          } catch {
+            // Remote style layers can arrive in several passes.
+          }
+        };
         gestureChangeHandler = (event: Event) => {
           const gestureEvent = event as Event & { rotation?: number };
 
@@ -712,6 +723,8 @@ export function MapView() {
         };
 
         map.on("styledata", initializeMapExperience);
+        map.on("styledata", handleStyleRefresh);
+        map.on("idle", handleStyleRefresh);
         map.on("load", initializeMapExperience);
         scheduleMapExperience(80);
         scheduleMapExperience(900);
