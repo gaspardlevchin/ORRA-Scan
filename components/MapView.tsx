@@ -669,6 +669,14 @@ export function MapView() {
 
           deferredCenterTimersRef.current.push(timerId);
         };
+        const scheduleInitialOverlayRefresh = (delay: number) => {
+          const timerId = window.setTimeout(() => {
+            enableInitialOverlays();
+            centerLoadedUserLocation();
+          }, delay);
+
+          deferredCenterTimersRef.current.push(timerId);
+        };
         const scheduleMapExperience = (delay: number) => {
           const timerId = window.setTimeout(initializeMapExperience, delay);
 
@@ -691,6 +699,9 @@ export function MapView() {
             enableInitialOverlays();
             scheduleLoadedUserCenter(160);
           }, 420);
+          scheduleInitialOverlayRefresh(1200);
+          scheduleInitialOverlayRefresh(2600);
+          scheduleInitialOverlayRefresh(5200);
         };
 
         map.on("styledata", initializeMapExperience);
